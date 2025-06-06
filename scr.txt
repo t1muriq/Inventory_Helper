@@ -1,0 +1,194 @@
+#!/bin/bash
+
+# Проверка прав root
+if [[ $EUID -ne 0 ]]; then
+    echo "Ошибка: скрипт требует прав root для работы с dmidecode. Запустите с sudo."
+    exit 1
+fi
+
+# Путь к папке со скриптом
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RESULTS_DIR="$SCRIPT_DIR/finals_results"
+mkdir -p "$RESULTS_DIR"
+
+# Настройка библиотек для xrandr
+export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
+
+# Проверка сети
+check_network() {
+    if ping -c 1 example.local &> /dev/null; then
+        echo "in"
+    elif ping -c 1 google.com &> /dev/null; then
+        echo "ru"
+    else
+        echo "none"
+    fi
+}
+
+NETWORK_TYPE=$(check_network)
+echo "Обнаружен тип сети: $NETWORK_TYPE"
+echo "Подтвердите (введите 1 для продолжения, любое другое значение для выхода):"
+read network_confirm
+if [ "$network_confirm" != "1" ]; then
+    echo "Сеть не подтверждена. Выход с кодом 2."
+    exit 2
+fi
+
+# Запрос пользовательских данных
+echo "Введите присваиваемый номер ИТ (например, 0555):"
+read it_number
+echo "Введите подразделение:"
+read department
+echo "Введите ответственного за ПК:"
+read responsible_person
+echo "Введите телефон:"
+read phone
+echo "Введите инвентарный номер НИИТП:"
+read inventory_number
+[ -z "$inventory_number" ] && inventory_number="Не указано"
+echo "Введите корпус и комнату ПК:"
+read location
+echo "Введите отдел, у кого позаимствовали (если ПК не свой, иначе оставьте пустым):"
+read borrowed_from
+echo "Введите комментарий (опционально):"
+read comment
+
+# Сбор системной информации
+HOSTNAME=$(hostname)
+IP_ADDRESS=$(ip addr show | grep -w inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d'/' -f1 | head -n 1 || echo "Не указано")
+MAC_ADDRESS=$(ip link show | grep ether | awk '{print $2}' | head -n 1 || echo "Не указано")
+SERIAL_NUMBER=$(dmidecode -t system | grep "Serial Number" | awk -F: '{print $2}' | xargs || echo "Не указано")
+PC_TYPE=$(dmidecode -t system | grep "Product Name" | awk -F: '{print $2}' | xargs || echo "Не указано")
+COMPONENTS=$(lsblk -d -o NAME,MODEL,SIZE | grep -v loop | awk '{print $2" "$3}' | xargs || echo "Не указано")
+CPU=$(cat /proc/cpuinfo | grep "model name" | head -n 1 | awk -F: '{print $2}' | xargs || echo "Не указано")
+MOTHERBOARD=$(dmidecode -t baseboard | grep "Product Name" | awk -F: '{print $2}' | xargs || echo "Не указано")
+VIDEO_ADAPTER=$(lspci | grep -E "VGA|3D" | awk -F: '{print $3}' | xargs || echo "Не обнаружено")
+RAM_TOTAL=$(cat /proc/meminfo | grep MemTotal | awk '{print $2/1024/1024 " GB"}' || echo "Не указано")
+RAM_SLOTS=$(dmidecode -t memory | grep -c "Memory Device" || echo "0")
+RAM_USED_SLOTS=$(dmidecode -t memory | grep -c "Size: [0-9]" || echo "0")
+DISKS=$(lsblk -d -o MODEL,SIZE | grep -v loop | awk '{print $1" "$2}' | paste -sd, - | xargs || echo "Не указано")
+MONITOR="Не указано"
+RESOLUTION="Не указано"
+XRANDR="$SCRIPT_DIR/bin/xrandr"
+if [ -x "$XRANDR" ]; then
+    if LD_LIBRARY_PATH="$SCRIPT_DIR/lib" DISPLAY=:0 "$XRANDR" --current >/dev/null 2>&1; then
+        MONITOR=$(LD_LIBRARY_PATH="$SCRIPT_DIR/lib" DISPLAY=:0 "$XRANDR" --current | grep -w connected | awk '{print $1}' | xargs || echo "Не указано")
+        RESOLUTION=$(LD_LIBRARY_PATH="$SCRIPT_DIR/lib" DISPLAY=:0 "$XRANDR" --current | grep -w connected -A1 | grep -v connected | awk '{print $1}' | xargs || echo "Не указано")
+    else
+        echo "X11-сервер недоступен, информация о мониторе не получена."
+        MONITOR="X11 недоступен"
+        RESOLUTION="X11 недоступен"
+    fi
+else
+    echo "Утилита xrandr не найдена в $SCRIPT_DIR/bin/."
+fi
+
+# Формирование файлов
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+OUTPUT_TXT="$RESULTS_DIR/$it_number.txt"
+
+printf '\xEF\xBB\xBF' > "$OUTPUT_TXT"
+
+# TXT
+cat <<EOT > "$OUTPUT_TXT"
+ПК
+Присваиваемый номер ИТ 171: $it_number
+Подразделение: $department
+Ответственный: $responsible_person
+Телефон: $phone
+Корпус и комната: ${location:-"Не указано"} корпус ${location:-"Не указано"} комната 
+Была ли попытка установки каспера: да
+На какую сеть стоит каспер: $NETWORK_TYPE
+Инвентарный номер НИИ ТП: $inventory_number
+DMI системный серийный номер                      ${SERIAL_NUMBER:-"To Be Filled By O.E.M."}
+Первичный адрес IP                                ${IP_ADDRESS:-"Не указано"}
+Первичный адрес MAC                               ${MAC_ADDRESS//:/-}
+-------------------------------------------------------------------------------------
+Системная память                                  ${RAM_TOTAL//[[:space:]]/}
+-------------------------------------------------------------------------------------
+Тип ЦП                                            ${CPU//x86_64/}
+-------------------------------------------------------------------------------------
+Системная плата                                   ${MOTHERBOARD:-"Не указано"}
+-------------------------------------------------------------------------------------
+Дисковый накопитель                               ${DISKS// / }  (${COMPONENTS})
+-------------------------------------------------------------------------------------
+Видеоадаптер                                      ${VIDEO_ADAPTER:-"Не обнаружено"}
+-------------------------------------------------------------------------------------
+Мониторы
+Присваиваемый номер ИТ 171: $it_number-01
+Монитор
+Разрешение: ??????
+Присваиваемый номер ИТ 171: $it_number-02
+Монитор
+Разрешение: ??????
+-------------------------------------------------------------------------------------
+ИБП
+Присваиваемый номер ИТ 171: $it_number-03
+-------------------------------------------------------------------------------------
+Состав рабочей станции:
+Комментарий: $comment
+EOT
+
+# Функция для безопасного вывода строковых значений в JSON
+json_string() {
+  if [ -z "$1" ]; then
+    echo null
+  else
+    printf '"%s"' "$(echo "$1" | sed 's/\\/\\\\/g; s/\"/\\\"/g')"
+  fi
+}
+
+# Формирование JSON-файла
+OUTPUT_JSON="$RESULTS_DIR/$it_number.json"
+
+cat <<EOT > "$OUTPUT_JSON"
+{
+  "PC": {
+    "Assigned_IT_Number": $(json_string "$it_number"),
+    "Department": $(json_string "$department"),
+    "Responsible": $(json_string "$responsible_person"),
+    "Phone": $(json_string "$phone"),
+    "Building_and_Room": $(json_string "$location"),
+    "Kaspersky_Installation_Attempted": "yes",
+    "Kaspersky_Network": $(json_string "$NETWORK_TYPE"),
+    "Inventory_Number_NII_TP": $(json_string "$inventory_number"),
+    "DMI_System_Serial_Number": $(json_string "$SERIAL_NUMBER"),
+    "Primary_IP_Address": $(json_string "$IP_ADDRESS"),
+    "Primary_MAC_Address": $(json_string "${MAC_ADDRESS//:/-}" )
+  },
+  "System_Memory": {
+    "Capacity": $(json_string "${RAM_TOTAL//[[:space:]]/}"),
+    "Type": "DDR4 SDRAM",
+    "Modules": [
+      {
+        "Name": null,
+        "Description": null
+      }
+    ]
+  },
+  "Processor": {
+    "Type": $(json_string "${CPU//x86_64/}"),
+    "Frequency": null
+  },
+  "Motherboard": {
+    "Model": $(json_string "$MOTHERBOARD")
+  },
+  "Disk_Drives": [
+    {
+      "Name": $(json_string "$DISKS"),
+      "Capacity": null
+    }
+  ],
+  "Video_Adapter": {
+    "Name": $(json_string "$VIDEO_ADAPTER"),
+    "Memory": null
+  },
+  "Monitors": null,
+  "UPS": {
+    "Assigned_IT_Number": $(json_string "$it_number-03")
+  },
+  "Workstation_Composition": "PC and 2 monitors and UPS",
+  "Comment": $(json_string "$comment")
+}
+EOT
+
