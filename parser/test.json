@@ -8,9 +8,9 @@
     "Kaspersky_Installation_Attempted": "да",
     "Kaspersky_Network": "ru",
     "Inventory_Number_NII_TP": "1000000000001",
-    "DMI_System_Serial_Number": "DMI системный серийный номер                      To Be Filled By O.E.M.",
-    "Primary_IP_Address": "Первичный адрес IP                                172.18.240.1",
-    "Primary_MAC_Address": "Первичный адрес MAC                               00-15-5D-78-23-E0"
+    "DMI_System_Serial_Number": "To Be Filled By O.E.M.",
+    "Primary_IP_Address": "172.18.240.1",
+    "Primary_MAC_Address": "00-15-5D-78-23-E0"
   },
   "System_Memory": {
     "Capacity": "15989 МБ",
@@ -66,6 +66,6 @@
   "UPS": {
     "Assigned_IT_Number": "4567-01"
   },
-  "Workstation_Composition": "ПК и 2 монитор(а) и  ИБП",
+  "Workstation_Composition": "ПК и 2 монитор(а) и ИБП",
   "Comment": ""
 }
