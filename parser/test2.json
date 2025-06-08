@@ -1,0 +1,75 @@
+{
+  "PC": {
+    "Assigned_IT_Number": "1",
+    "Department": "1",
+    "Responsible": "1",
+    "Phone": "1",
+    "Building_and_Room": "1 корпус 1 комната",
+    "Kaspersky_Installation_Attempted": "да",
+    "Kaspersky_Network": "in",
+    "Inventory_Number_NII_TP": "1",
+    "DMI_System_Serial_Number": "DMI системный серийный номер                      Default string",
+    "Primary_IP_Address": "Первичный адрес IP                                172.31.32.1",
+    "Primary_MAC_Address": "Первичный адрес MAC                               00-00-00-00-00-00"
+  },
+  "System_Memory": {
+    "Capacity": "32691МБ",
+    "Type": "DDR4 SDRAM",
+    "Modules": [
+      {
+        "Name": "DIMM3",
+        "Description": "Kingston Fury KF3600C18D4/16GX 16 ГБ DDR4-3600 DDR4 SDRAM (22-22-22-44 @ 1798 МГц) (21-22-22-44 @ 1798 МГц) (20-22-22-44 @ 1798 МГц) (19-22-22-44 @ 1798 МГц) (18-22-22-44 @ 1798 МГц) (17-21-21-42 @ 1700 МГц) (16-20-20-40 @ 1600 МГц) (15-19-19-37 @ 1500 МГц) (14-18-18-35 @ 1400 МГц) (13-16-16-32 @ 1300 МГц) (12-15-15-30 @ 1200 МГц) (11-14-14-27 @ 1100 МГц) (10-13-13-25 @ 1000 МГц)"
+      },
+      {
+        "Name": "DIMM4",
+        "Description": "Kingston Fury KF3600C18D4/16GX 16 ГБ DDR4-3600 DDR4 SDRAM (22-22-22-44 @ 1798 МГц) (21-22-22-44 @ 1798 МГц) (20-22-22-44 @ 1798 МГц) (19-22-22-44 @ 1798 МГц) (18-22-22-44 @ 1798 МГц) (17-21-21-42 @ 1700 МГц) (16-20-20-40 @ 1600 МГц) (15-19-19-37 @ 1500 МГц) (14-18-18-35 @ 1400 МГц) (13-16-16-32 @ 1300 МГц) (12-15-15-30 @ 1200 МГц) (11-14-14-27 @ 1100 МГц) (10-13-13-25 @ 1000 МГц)"
+      }
+    ]
+  },
+  "Processor": {
+    "Type": "HexaCore AMD Ryzen 5 5600",
+    "Frequency": "4419 MHz (44.5 x 99)"
+  },
+  "Motherboard": {
+    "Model": "Gigabyte B450M S2H  (2 PCI-E x1, 1 PCI-E x16, 1 M.2, 2 DDR4 DIMM, Audio, Video, Gigabit LAN)"
+  },
+  "Disk_Drives": [
+    {
+      "Name": "CT240BX500SSD1",
+      "Capacity": "240 ГБ, SATA-III"
+    },
+    {
+      "Name": "CT960BX500SSD1",
+      "Capacity": "960 ГБ, SATA-III"
+    },
+    {
+      "Name": "WDC WD10EZEX-08WN4A0",
+      "Capacity": "1 ТБ, 7200 RPM, SATA-III"
+    }
+  ],
+  "Video_Adapter": {
+    "Name": "Видеоадаптер                                      NVIDIA GeForce RTX 4070",
+    "Memory": "12282 МБ"
+  },
+  "Monitors": [
+    {
+      "Assigned_IT_Number": "1-01",
+      "Model": "Универсальный монитор PnP [NoDB]",
+      "Serial_Number": "0000000000000",
+      "Year": "2024",
+      "Resolution": "??????"
+    },
+    {
+      "Assigned_IT_Number": "1-02",
+      "Model": "Универсальный монитор PnP [NoDB]",
+      "Serial_Number": "31466666",
+      "Year": "2021",
+      "Resolution": "??????"
+    }
+  ],
+  "UPS": {
+    "Assigned_IT_Number": "1-01"
+  },
+  "Workstation_Composition": "ПК и 2 монитор(а) и  ИБП",
+  "Comment": "1"
+}
