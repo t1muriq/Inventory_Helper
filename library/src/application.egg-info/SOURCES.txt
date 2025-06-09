@@ -8,3 +8,10 @@ src/application.egg-info/PKG-INFO
 src/application.egg-info/SOURCES.txt
 src/application.egg-info/dependency_links.txt
 src/application.egg-info/top_level.txt
+src/application/db/__init__.py
+src/application/db/database.py
+src/application/db/init_db.py
+src/application/db/models.py
+src/application/db/repositories.py
+src/application/db/repository.py
+src/application/db/services.py
