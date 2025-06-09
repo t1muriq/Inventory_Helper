@@ -158,8 +158,13 @@ class Model:
                 else:
                     break
         # --- UPS ---
-        ups_line = next((l for l in lines if l.startswith('Присваиваемый номер ИТ 171:') and '-' in l), None)
-        ups = UPSModel(Assigned_IT_Number=self._clean_value(ups_line.split(':',1)[-1].strip(), 'Присваиваемый номер ИТ 171:') if ups_line else '')
+        ups_idx = lines.index('ИБП') if 'ИБП' in lines else -1
+        ups_assigned_it_number = ''
+        if ups_idx != -1 and ups_idx + 1 < len(lines):
+            ups_line = lines[ups_idx + 1]
+            if ups_line.startswith('Присваиваемый номер ИТ 171:'):
+                ups_assigned_it_number = self._clean_value(ups_line.split(':',1)[-1].strip(), 'Присваиваемый номер ИТ 171:')
+        ups = UPSModel(Assigned_IT_Number=ups_assigned_it_number)
 
         # --- Workstation Composition ---
         ws_comp = self._clean_value(self._get_value(lines, 'Состав рабочей станции:'), 'Состав рабочей станции:')
@@ -203,11 +208,21 @@ class Model:
                     room = building_room_str.strip().split(" ")[1] if len(building_room_str.strip().split(" ")) > 1 else ""
             
             # --- Формирование "Состав рабочей станции" ---
-            pc_it_number = self._clean_value(item.PC.Assigned_IT_Number)
+            # Собираем все номера ИТ, которые должны быть в составе рабочей станции
+            composition_items = []
+
+            # Добавляем номера ИТ мониторов, если они есть
             monitor_it_numbers = [self._clean_value(m.Assigned_IT_Number) for m in item.Monitors if self._clean_value(m.Assigned_IT_Number)]
+            if monitor_it_numbers:
+                composition_items.extend(monitor_it_numbers)
             
-            # Теперь этот столбец содержит только номера мониторов через перенос строки
-            workstation_composition_display = "\n".join(monitor_it_numbers)
+            # Добавляем номер ИТ ИБП, если он есть
+            ups_it_number = self._clean_value(item.UPS.Assigned_IT_Number)
+            if ups_it_number:
+                composition_items.append(ups_it_number)
+
+            # Объединяем все элементы через перенос строки
+            workstation_composition_display = "\n".join(composition_items) if composition_items else ""
             
             # --- Формирование "Характеристики" ---
             characteristics = []
