@@ -1,0 +1,10 @@
+pyproject.toml
+src/application/__init__.py
+src/application/base_models.py
+src/application/controller.py
+src/application/model.py
+src/application/view.py
+src/application.egg-info/PKG-INFO
+src/application.egg-info/SOURCES.txt
+src/application.egg-info/dependency_links.txt
+src/application.egg-info/top_level.txt
