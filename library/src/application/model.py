@@ -1,6 +1,6 @@
 import re
 import pandas as pd
-from typing import List, Optional
+from typing import List, Dict, Optional
 
 from application.base_models import (
     PCModel,
@@ -43,73 +43,65 @@ class Model:
 
     @staticmethod
     def _split_type_freq(line: str) -> tuple[str, str]:
-        m = re.match(r"(.+?),\s*([\d .xMHzМГц\(\)]+)", line)
+        m = re.match(r"(.+?),\s*([\d .xMHzМГц()]+)", line)
         if m:
             return m.group(1).strip(), m.group(2).strip()
         return line, ""
 
-    def load_from_txt(self, filepath: str) -> None:
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                lines = [
-                    line.strip()
-                    for line in f
-                    if line.strip() and set(line.strip()) != {"-"}
-                ]
-        except UnicodeDecodeError:
+    @staticmethod
+    def read_lines_from_file(filepath: str) -> List[str]:
+        lines = None
+        last_exception = None
+
+        for type_encoding in ["utf-8", "windows-1251"]:
             try:
-                with open(filepath, "r", encoding="windows-1251") as f:
+                with open(filepath, "r", encoding=type_encoding) as f:
                     lines = [
                         line.strip()
                         for line in f
                         if line.strip() and set(line.strip()) != {"-"}
                     ]
-            except Exception as e:
+                break
+            except UnicodeDecodeError as e:
+                last_exception = e
+                continue
+            except OSError as e:
+
+                raise IOError(f"Не удалось прочитать файл {filepath}: {e}") from e
+
+        if lines is None:
+            if last_exception:
                 raise IOError(
-                    f"Не удалось прочитать файл {filepath} с кодировками UTF-8 или Windows-1251: {e}"
-                ) from e
-        except Exception as e:
-            raise IOError(f"Не удалось прочитать файл {filepath}: {e}") from e
+                    f"Не удалось прочитать файл {filepath} с кодировками UTF-8 или Windows-1251: {last_exception}") from last_exception
+            else:
+                raise IOError(
+                    f"Не удалось прочитать файл {filepath} с кодировками UTF-8 или Windows-1251."
+                )
+        return lines
 
+    def parse_pc_info(self, lines: List[str]) -> Dict[str, str]:
         # --- PC --- (Остальные части из parser_txt_to_json.py) ---
-        pc = {}
-        pc["Assigned_IT_Number"] = self._clean_value(
-            self._get_value(lines, "Присваиваемый номер ИТ 171:"),
-            "Присваиваемый номер ИТ 171:",
-        )
-        pc["Department"] = self._clean_value(
-            self._get_value(lines, "Подразделение:"), "Подразделение:"
-        )
-        pc["Responsible"] = self._clean_value(
-            self._get_value(lines, "Ответственный:"), "Ответственный:"
-        )
-        pc["Phone"] = self._clean_value(self._get_value(lines, "Телефон:"), "Телефон:")
-        pc["Building_and_Room"] = self._clean_value(
-            self._get_value(lines, "Корпус и комната:"), "Корпус и комната:"
-        )
-        pc["Kaspersky_Installation_Attempted"] = self._clean_value(
-            self._get_value(lines, "Была ли попытка установки каспера:"),
-            "Была ли попытка установки каспера:",
-        )
-        pc["Kaspersky_Network"] = self._clean_value(
-            self._get_value(lines, "На какую сеть стоит каспер:"),
-            "На какую сеть стоит каспер:",
-        )
-        pc["Inventory_Number_NII_TP"] = self._clean_value(
-            self._get_value(lines, "Инвентарный номер НИИ ТП:"),
-            "Инвентарный номер НИИ ТП:",
-        )
-        pc["DMI_System_Serial_Number"] = self._clean_value(
-            self._get_value(lines, "DMI системный серийный номер"),
-            "DMI системный серийный номер",
-        )
-        pc["Primary_IP_Address"] = self._clean_value(
-            self._get_value(lines, "Первичный адрес IP"), "Первичный адрес IP"
-        )
-        pc["Primary_MAC_Address"] = self._clean_value(
-            self._get_value(lines, "Первичный адрес MAC"), "Первичный адрес MAC"
-        )
+        pc_fields = [
+            ("Assigned_IT_Number", "Присваиваемый номер ИТ 171:"),
+            ("Department", "Подразделение:"),
+            ("Responsible", "Ответственный:"),
+            ("Phone", "Телефон:"),
+            ("Building_and_Room", "Корпус и комната:"),
+            ("Kaspersky_Installation_Attempted", "Была ли попытка установки каспера:"),
+            ("Kaspersky_Network", "На какую сеть стоит каспер:"),
+            ("Inventory_Number_NII_TP", "Инвентарный номер НИИ ТП:"),
+            ("DMI_System_Serial_Number", "DMI системный серийный номер"),
+            ("Primary_IP_Address", "Первичный адрес IP"),
+            ("Primary_MAC_Address", "Первичный адрес MAC"),
+        ]
 
+        pc = {}
+        for key, label in pc_fields:
+            value = self._get_value(lines, label)
+            pc[key] = self._clean_value(value, label)
+        return pc
+
+    def parse_system_memory(self, lines: List[str]) -> SystemMemoryModel:
         # --- System Memory ---
         mem_capacity_line = self._get_value(lines, "Системная память")
         mem_capacity_match = re.search(r"(\d+)\s*(\S+)", mem_capacity_line)
@@ -134,23 +126,26 @@ class Model:
                 desc = re.sub(r"\s*\([^)]*\)", "", desc).strip()
                 desc = self._clean_value(desc)
                 modules.append(MemoryModule(Name=name, Description=desc))
-        system_memory = SystemMemoryModel(
+        return SystemMemoryModel(
             Capacity=mem_capacity, Type=mem_type, Modules=modules
         )
 
+    def parse_processor(self, lines: List[str]) -> ProcessorModel:
         # --- Processor ---
         proc_line = self._get_value(lines, "Тип ЦП")
         proc_type_full, proc_freq = self._split_type_freq(proc_line)
         proc_type = self._clean_value(proc_type_full, "Тип ЦП")
-        processor = ProcessorModel(
+        return ProcessorModel(
             Type=proc_type, Frequency=self._clean_value(proc_freq)
         )
 
+    def parse_motherboard(self, lines: List[str]) -> MotherboardModel:
         # --- Motherboard ---
         mb_model_line = self._get_value(lines, "Системная плата")
         mb_model = self._clean_value(mb_model_line, "Системная плата")
-        motherboard = MotherboardModel(Model=mb_model)
+        return MotherboardModel(Model=mb_model)
 
+    def parse_disk_drives(self, lines: List[str]) -> List[DiskDriveModel]:
         # --- Disk Drives ---
         disk_drives = []
         for l in lines:
@@ -166,7 +161,9 @@ class Model:
                 disk_drives.append(
                     DiskDriveModel(Name=name, Capacity=self._clean_value(cap))
                 )
+        return disk_drives
 
+    def parse_video_adapter(self, lines: List[str]) -> VideoAdapterModel:
         # --- Video Adapter ---
         video_line = self._get_value(lines, "Видеоадаптер")
         m = re.match(r"(.+?)\s+\((.+)\)", video_line)
@@ -177,10 +174,11 @@ class Model:
             video_name = video_line
             video_mem = ""
         video_name = self._clean_value(video_name, "Видеоадаптер")
-        video_adapter = VideoAdapterModel(
+        return VideoAdapterModel(
             Name=video_name, Memory=self._clean_value(video_mem)
         )
 
+    def parse_monitors(self, lines: List[str]) -> List[MonitorModel]:
         # --- Monitors ---
         monitors = []
         mon_idx = lines.index("Мониторы") if "Мониторы" in lines else -1
@@ -221,6 +219,9 @@ class Model:
                     i += 3
                 else:
                     break
+        return monitors
+
+    def parse_ups(self, lines: List[str]) -> UPSModel:
         # --- UPS ---
         ups_idx = lines.index("ИБП") if "ИБП" in lines else -1
         ups_assigned_it_number = ""
@@ -230,15 +231,33 @@ class Model:
                 ups_assigned_it_number = self._clean_value(
                     ups_line.split(":", 1)[-1].strip(), "Присваиваемый номер ИТ 171:"
                 )
-        ups = UPSModel(Assigned_IT_Number=ups_assigned_it_number)
+        return UPSModel(Assigned_IT_Number=ups_assigned_it_number)
 
-        # --- Workstation Composition ---
+    def parse_misc_info(self, lines: List[str]) -> Dict[str, str]:
+        # --- Workstation Composition and Comment ---
         ws_comp = self._clean_value(
             self._get_value(lines, "Состав рабочей станции:"), "Состав рабочей станции:"
         )
         comment = self._clean_value(
             self._get_value(lines, "Комментарий:"), "Комментарий:"
         )
+        return {
+            "Workstation_Composition": ws_comp,
+            "Comment": comment
+        }
+
+    def load_from_txt(self, filepath: str) -> None:
+        lines = self.read_lines_from_file(filepath)
+
+        pc = self.parse_pc_info(lines)
+        system_memory = self.parse_system_memory(lines)
+        processor = self.parse_processor(lines)
+        motherboard = self.parse_motherboard(lines)
+        disk_drives = self.parse_disk_drives(lines)
+        video_adapter = self.parse_video_adapter(lines)
+        monitors = self.parse_monitors(lines)
+        ups = self.parse_ups(lines)
+        misc_info = self.parse_misc_info(lines)
 
         parsed_data = DataModel(
             PC=PCModel(**pc),
@@ -249,8 +268,8 @@ class Model:
             Video_Adapter=video_adapter,
             Monitors=monitors,
             UPS=ups,
-            Workstation_Composition=ws_comp,
-            Comment=comment,
+            Workstation_Composition=misc_info["Workstation_Composition"],
+            Comment=misc_info["Comment"],
         )
         self.data.append(parsed_data)
 
@@ -275,7 +294,7 @@ class Model:
                 room = room_match.group(1)
             # Fallback if no specific pattern found, use the whole string for building, if room is empty
             if (
-                not building and building_room_str
+                    not building and building_room_str
             ):  # If building not found, but string exists
                 building = (
                     building_room_str.strip().split(" ")[0]
@@ -340,7 +359,7 @@ class Model:
                             f"Диск: {self._clean_value(d.Name)} ({self._clean_value(d.Capacity)})"
                         )
             if item.Video_Adapter and (
-                item.Video_Adapter.Name or item.Video_Adapter.Memory
+                    item.Video_Adapter.Name or item.Video_Adapter.Memory
             ):
                 characteristics.append(
                     f"Видео: {self._clean_value(item.Video_Adapter.Name)} ({self._clean_value(item.Video_Adapter.Memory)})"
@@ -361,11 +380,11 @@ class Model:
                 getattr(item.PC, "Kaspersky_Serial_Number", None)
             )
             if (
-                not kaspersky_serial
+                    not kaspersky_serial
             ):  # Если нет номера, но есть инфа о каспере, можно добавить Да/Нет
                 if (
-                    self._clean_value(item.PC.Kaspersky_Installation_Attempted).lower()
-                    == "да"
+                        self._clean_value(item.PC.Kaspersky_Installation_Attempted).lower()
+                        == "да"
                 ):
                     kaspersky_serial = "Да"
                 else:
@@ -396,7 +415,7 @@ class Model:
                         if self._clean_value(
                             item.PC.Kaspersky_Installation_Attempted
                         ).lower()
-                        == "да"
+                           == "да"
                         else "Нет"
                     ),
                 }
