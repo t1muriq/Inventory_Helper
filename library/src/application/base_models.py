@@ -15,29 +15,36 @@ class PCModel(BaseModel):
     Primary_IP_Address: str
     Primary_MAC_Address: str
 
+
 class MemoryModule(BaseModel):
     Name: str
     Description: str
+
 
 class SystemMemoryModel(BaseModel):
     Capacity: str
     Type: str
     Modules: List[MemoryModule]
 
+
 class ProcessorModel(BaseModel):
     Type: str
     Frequency: str
 
+
 class MotherboardModel(BaseModel):
     Model: str
+
 
 class DiskDriveModel(BaseModel):
     Name: str
     Capacity: str
 
+
 class VideoAdapterModel(BaseModel):
     Name: str
     Memory: str
+
 
 class MonitorModel(BaseModel):
     Assigned_IT_Number: str
@@ -46,8 +53,10 @@ class MonitorModel(BaseModel):
     Year: str
     Resolution: str
 
+
 class UPSModel(BaseModel):
     Assigned_IT_Number: str
+
 
 class DataModel(BaseModel):
     PC: PCModel

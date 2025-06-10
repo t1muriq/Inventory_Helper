@@ -3,17 +3,20 @@ from application.view import View
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from typing import List
 
+
 class Controller:
     def __init__(self, model: Model, view: View) -> None:
         self.model = model
         self.view = view
-        self.loaded_file_paths: List[str] = [] # Список полных путей загруженных файлов
+        self.loaded_file_paths: List[str] = []  # Список полных путей загруженных файлов
         self._connect_signals()
 
     def _connect_signals(self) -> None:
         self.view.select_button.clicked.connect(self._on_select_files)
         self.view.convert_button.clicked.connect(self._on_convert_to_excel)
-        self.view.clear_button.clicked.connect(self._on_clear_selected_file) # Подключаем кнопку очистки
+        self.view.clear_button.clicked.connect(
+            self._on_clear_selected_file
+        )  # Подключаем кнопку очистки
 
     def _on_select_files(self) -> None:
         self.view.status.setText("Выбор файлов...")
@@ -25,38 +28,53 @@ class Controller:
             self.model.clear_data()
             self.loaded_file_paths.clear()
             self.view.file_list.clear()
-            
+
             self.view.status.setText("Загрузка и парсинг файлов...")
-            
+
             for file_path in files:
                 try:
                     self.model.load_from_txt(file_path)
-                    self.loaded_file_paths.append(file_path) # Сохраняем путь только для успешно загруженных
+                    self.loaded_file_paths.append(
+                        file_path
+                    )  # Сохраняем путь только для успешно загруженных
                     self.view.file_list.addItem(f"✓ {file_path.split('/')[-1]}")
                 except IOError as e:
                     QMessageBox.critical(
-                        self.view, "Ошибка чтения файла", 
-                        f"Не удалось открыть или прочитать файл {file_path.split('/')[-1]}:\n{e}"
+                        self.view,
+                        "Ошибка чтения файла",
+                        f"Не удалось открыть или прочитать файл {file_path.split('/')[-1]}:\n{e}",
                     )
-                    self.view.file_list.addItem(f"✗ {file_path.split('/')[-1]} (Ошибка чтения)")
+                    self.view.file_list.addItem(
+                        f"✗ {file_path.split('/')[-1]} (Ошибка чтения)"
+                    )
                 except ValueError as e:
                     QMessageBox.critical(
-                        self.view, "Ошибка формата данных", 
-                        f"Файл {file_path.split('/')[-1]} содержит данные неправильного формата:\n{e}"
+                        self.view,
+                        "Ошибка формата данных",
+                        f"Файл {file_path.split('/')[-1]} содержит данные неправильного формата:\n{e}",
                     )
-                    self.view.file_list.addItem(f"✗ {file_path.split('/')[-1]} (Неверный формат)")
+                    self.view.file_list.addItem(
+                        f"✗ {file_path.split('/')[-1]} (Неверный формат)"
+                    )
                 except Exception as e:
                     QMessageBox.critical(
-                        self.view, "Неизвестная ошибка", 
-                        f"Произошла непредвиденная ошибка при обработке файла {file_path.split('/')[-1]}:\n{e}"
+                        self.view,
+                        "Неизвестная ошибка",
+                        f"Произошла непредвиденная ошибка при обработке файла {file_path.split('/')[-1]}:\n{e}",
                     )
-                    self.view.file_list.addItem(f"✗ {file_path.split('/')[-1]} (Неизвестная ошибка)")
-            
-            if not self.loaded_file_paths: # Если ни один файл не загрузился успешно
-                self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...") # Снова placeholder
+                    self.view.file_list.addItem(
+                        f"✗ {file_path.split('/')[-1]} (Неизвестная ошибка)"
+                    )
+
+            if not self.loaded_file_paths:  # Если ни один файл не загрузился успешно
+                self.view.file_list.addItem(
+                    "Здесь появятся выбранные TXT отчеты..."
+                )  # Снова placeholder
                 self.view.status.setText("Нет файлов для загрузки или все с ошибками.")
             else:
-                self.view.status.setText(f"Успешно загружено {len(self.loaded_file_paths)} файлов.")
+                self.view.status.setText(
+                    f"Успешно загружено {len(self.loaded_file_paths)} файлов."
+                )
         else:
             self.view.status.setText("Выбор файлов отменён.")
 
@@ -67,9 +85,10 @@ class Controller:
             return
 
         reply = QMessageBox.question(
-            self.view, "Подтверждение", 
+            self.view,
+            "Подтверждение",
             "Вы действительно хотите удалить выделенный файл из списка?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -79,16 +98,22 @@ class Controller:
                     # Удаляем из внутренних списков
                     removed_path = self.loaded_file_paths.pop(row)
                     # Удаляем соответствующий объект из модели по индексу
-                    if row < len(self.model.data): # Проверяем, чтобы избежать IndexError
+                    if row < len(
+                        self.model.data
+                    ):  # Проверяем, чтобы избежать IndexError
                         self.model.data.pop(row)
-                    
+
                     # Удаляем из GUI списка
                     self.view.file_list.takeItem(row)
-                    self.view.status.setText(f"Файл {removed_path.split('/')[-1]} удален. Обновлено: {len(self.loaded_file_paths)} файлов.")
+                    self.view.status.setText(
+                        f"Файл {removed_path.split('/')[-1]} удален. Обновлено: {len(self.loaded_file_paths)} файлов."
+                    )
                 else:
-                    self.view.status.setText("Ошибка: выбранный файл не найден во внутренних данных.")
-            
-            if not self.loaded_file_paths: # Если список стал пустым после удаления
+                    self.view.status.setText(
+                        "Ошибка: выбранный файл не найден во внутренних данных."
+                    )
+
+            if not self.loaded_file_paths:  # Если список стал пустым после удаления
                 self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
                 self.view.status.setText("Список файлов пуст.")
 
@@ -100,21 +125,29 @@ class Controller:
 
         self.view.status.setText("Сохранение в Excel...")
         save_path, _ = QFileDialog.getSaveFileName(
-            self.view, "Сохранить Excel файл", "Отчет_инвентаризации.xlsx", "Excel Files (*.xlsx)"
+            self.view,
+            "Сохранить Excel файл",
+            "Отчет_инвентаризации.xlsx",
+            "Excel Files (*.xlsx)",
         )
 
         if save_path:
             try:
                 self.model.export_to_excel(save_path)
-                QMessageBox.information(self.view, "Успех", f"Данные успешно сохранены в {save_path}")
-                self.view.status.setText(f"Данные сохранены в {save_path}. Данные очищены.")
+                QMessageBox.information(
+                    self.view, "Успех", f"Данные успешно сохранены в {save_path}"
+                )
+                self.view.status.setText(
+                    f"Данные сохранены в {save_path}. Данные очищены."
+                )
                 self.model.clear_data()
                 self.loaded_file_paths.clear()
                 self.view.file_list.clear()
                 self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
             except Exception as e:
-                QMessageBox.critical(self.view, "Ошибка сохранения", f"Не удалось сохранить файл:\n{e}")
+                QMessageBox.critical(
+                    self.view, "Ошибка сохранения", f"Не удалось сохранить файл:\n{e}"
+                )
                 self.view.status.setText(f"Ошибка при сохранении: {e}")
         else:
             self.view.status.setText("Сохранение в Excel отменено.")
-    

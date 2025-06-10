@@ -1,9 +1,19 @@
 import sys
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget, QLabel, QGroupBox, QSizePolicy, QSpacerItem
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QListWidget,
+    QLabel,
+    QGroupBox,
+    QSizePolicy,
+    QSpacerItem,
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
+
 
 class View(QWidget):
     select_button: QPushButton
@@ -16,7 +26,8 @@ class View(QWidget):
         super().__init__()
         self.setWindowTitle("Система инвентаризации НИИ ТП")
         self.setGeometry(100, 100, 600, 480)
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QWidget {
                 background-color: #2C3E50; /* Темно-синий фон */
                 color: #ECF0F1; /* Светлый текст */
@@ -75,7 +86,8 @@ class View(QWidget):
                 font-size: 13px;
                 color: #BDC3C7;
             }
-        """)
+        """
+        )
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(30, 25, 30, 25)
@@ -91,7 +103,9 @@ class View(QWidget):
         file_selection_group = QGroupBox("Загрузка отчетов инвентаризации (.txt)")
         file_selection_layout = QVBoxLayout()
         self.select_button = QPushButton("Выбрать файлы отчетов инвентаризации")
-        self.select_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.select_button.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         file_selection_layout.addWidget(self.select_button)
         self.file_list = QListWidget()
         self.file_list.setMinimumHeight(150)
@@ -103,8 +117,10 @@ class View(QWidget):
         # Группа для действий (кнопки)
         actions_group = QGroupBox("Действия с данными")
         actions_layout = QHBoxLayout()
-        actions_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-        
+        actions_layout.addSpacerItem(
+            QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        )
+
         self.convert_button = QPushButton("Сформировать итоговый Excel отчет")
         actions_layout.addWidget(self.convert_button)
 
@@ -112,7 +128,9 @@ class View(QWidget):
         self.clear_button.setObjectName("clearButton")
         actions_layout.addWidget(self.clear_button)
 
-        actions_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        actions_layout.addSpacerItem(
+            QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        )
         actions_group.setLayout(actions_layout)
         main_layout.addWidget(actions_group)
 
@@ -125,6 +143,7 @@ class View(QWidget):
         main_layout.addStretch(1)
 
         self.setLayout(main_layout)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
