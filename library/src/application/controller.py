@@ -1,4 +1,4 @@
-from application.model import Model
+from application.new_model.refactor_model import Model
 from application.view import View
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from typing import List
@@ -16,7 +16,7 @@ class Controller:
         self.view.convert_button.clicked.connect(self._on_convert_to_excel)
         self.view.clear_button.clicked.connect(
             self._on_clear_selected_file
-        )  # Подключаем кнопку очистки
+        )
 
     def _on_select_files(self) -> None:
         self.view.status.setText("Выбор файлов...")
@@ -33,7 +33,7 @@ class Controller:
 
             for file_path in files:
                 try:
-                    self.model.load_from_txt(file_path)
+                    self.model.load_data(file_path)
                     self.loaded_file_paths.append(
                         file_path
                     )  # Сохраняем путь только для успешно загруженных
@@ -133,7 +133,7 @@ class Controller:
 
         if save_path:
             try:
-                self.model.export_to_excel(save_path)
+                self.model.export_data(save_path)
                 QMessageBox.information(
                     self.view, "Успех", f"Данные успешно сохранены в {save_path}"
                 )
