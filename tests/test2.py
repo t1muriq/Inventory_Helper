@@ -3,8 +3,8 @@ from unittest.mock import Mock, patch, mock_open, MagicMock
 
 from application.model import Model as TrueModel
 from application.base_models import PCModel
-from application.new_model.refactor_model import Model as WrongModel, SystemMemoryParser
-from application.new_model.refactor_model import PCParser, FileReader, ParsingUtils
+from application.new_model.refactor_model import Model as WrongModel
+from application.new_model.refactor_model import DataParser, FileReader, ParsingUtils, ExcelExporter
 
 
 class TestFunctions(unittest.TestCase):
@@ -54,7 +54,11 @@ DIMM3: CD4-US08G32M22-01                          8 ГБ DDR4-3200 DDR4 SDRAM  (
 
     def setUp(self):
         self.right_model = TrueModel()
-        self.wrong_model = WrongModel()
+        self.parser = DataParser()
+        self.file_reader = FileReader()
+        self.excel_exp = ExcelExporter()
+        self.wrong_model = WrongModel(self.file_reader, self.excel_exp)
+
 
     @patch("builtins.open", new_callable=mock_open, read_data=test_file)
     def test_func_to_txt(self, mock_file_open):
@@ -64,16 +68,16 @@ DIMM3: CD4-US08G32M22-01                          8 ГБ DDR4-3200 DDR4 SDRAM  (
 
     @patch("builtins.open", new_callable=mock_open, read_data=test_file)
     def test_pc_parser(self, mock_file_open):
-        lines = FileReader.read_data_from_file("blank", )
+        lines = self.file_reader.read_data_from_file("blank")
         print(lines, "dsa")
         res_true = PCModel(**self.right_model.parse_pc_info(lines))
-        res_false = PCParser.parse(lines)
+        res_false = self.parser.parse_pc(lines)
         self.assertEqual(res_true, res_false)
 
     @patch("builtins.open", new_callable=mock_open, read_data=test_file)
     def test_clean_util(self, mock_file_open):
         label = "DMI системный серийный номер"
-        lines = FileReader.read_data_from_file("blank", )
+        lines = self.file_reader.read_data_from_file("blank", )
         value = self.right_model._get_value(lines, label)
 
         res_a = self.right_model._clean_value(value, label)
@@ -83,7 +87,7 @@ DIMM3: CD4-US08G32M22-01                          8 ГБ DDR4-3200 DDR4 SDRAM  (
     @patch("builtins.open", new_callable=mock_open, read_data=test_file)
     def test_get_value(self, mock_file_open):
         label = "Системная память"
-        lines = FileReader.read_data_from_file("blank", )
+        lines = self.file_reader.read_data_from_file("blank", )
 
         res_true = self.right_model._get_value(lines, label)
         res_false = ParsingUtils.get_value(lines, label)
@@ -91,9 +95,9 @@ DIMM3: CD4-US08G32M22-01                          8 ГБ DDR4-3200 DDR4 SDRAM  (
 
     @patch("builtins.open", new_callable=mock_open, read_data=test_file)
     def test_memory_parser(self, mock_file_open):
-        lines = FileReader.read_data_from_file("blank", )
+        lines = self.file_reader.read_data_from_file("blank", )
         res_true = self.right_model.parse_system_memory(lines)
-        res_false = SystemMemoryParser.parse(lines)
+        res_false = self.parser.parse_system_memory(lines)
         self.assertEqual(res_true, res_false)
 
 if __name__ == '__main__':
