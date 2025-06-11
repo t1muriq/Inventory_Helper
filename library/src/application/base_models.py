@@ -60,6 +60,7 @@ class UPSModel(BaseModel):
 
 
 class DataModel(BaseModel):
+    Type: str = "Стационарный ПК"
     PC: PCModel
     System_Memory: SystemMemoryModel
     Processor: ProcessorModel

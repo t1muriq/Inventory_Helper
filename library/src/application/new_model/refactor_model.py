@@ -277,6 +277,10 @@ class DataParser:
         self.parsed_data["Workstation_Composition"] = ws_comp
         self.parsed_data["Comment"] = comment
 
+    @parser_method
+    def parse_type_pc(self, lines: List[str]):
+        self.parsed_data["Type"] = lines[0]
+
     def parse_all_data(self, lines: List[str]) -> DataModel:
         for name in dir(self):
             method = getattr(self, name)
@@ -303,7 +307,7 @@ class ExcelExporter(IExporter):
                     "Корпус": item.PC.Building,
                     "Комната": item.PC.Room,
                     "Телефон": item.PC.Phone,
-                    "Тип устройства": 'Стационарный ПК',
+                    "Тип устройства": item.Type,
                     "Характеристики":
                         '\n'.join([f"Память: {item.System_Memory.Capacity} {item.System_Memory.Type}"] +
                                   [f"{m.Name} {m.Description}" for m in item.System_Memory.Modules] +
