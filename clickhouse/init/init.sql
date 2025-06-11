@@ -1,4 +1,4 @@
-CREATE TABLE computers_analytics
+CREATE TABLE IF NOT EXISTS computers_analytics
 (
     computer_id           UInt32,
     building              String,
@@ -19,7 +19,6 @@ CREATE TABLE computers_analytics
     video_memory_gb       UInt16,
     monitor_model         String,
     monitor_resolution    String,
-    monitor_year          UInt16,
     has_ups               Bool,
     comment               String,
     load_date             DateTime
