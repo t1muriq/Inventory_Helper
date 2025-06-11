@@ -231,11 +231,9 @@ class DataParser:
                         if m:
                             model = ParsingUtils.clean_value(m.group(1), "Монитор")
                             serial = ParsingUtils.clean_value(m.group(2))
-                            year = ParsingUtils.clean_value(m.group(3))
                         else:
                             model = ParsingUtils.clean_value(lines[i + 1][8:], "Монитор")
                             serial = ""
-                            year = ""
                     if i + 2 < len(lines) and lines[i + 2].startswith("Разрешение:"):
                         res = ParsingUtils.clean_value(
                             lines[i + 2].split(":", 1)[-1].strip(), "Разрешение:"
@@ -245,7 +243,6 @@ class DataParser:
                             Assigned_IT_Number=assigned,
                             Model=model,
                             Serial_Number=serial,
-                            Year=year,
                             Resolution=res,
                         )
                     )
