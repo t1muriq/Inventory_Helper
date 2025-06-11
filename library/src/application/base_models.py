@@ -7,7 +7,8 @@ class PCModel(BaseModel):
     Department: str
     Responsible: str
     Phone: str
-    Building_and_Room: str
+    Building: str
+    Room: str
     Kaspersky_Installation_Attempted: str
     Kaspersky_Network: str
     Inventory_Number_NII_TP: str

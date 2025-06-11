@@ -116,6 +116,19 @@ class DataParser:
         for key, label in pc_fields:
             value = ParsingUtils.get_value(lines, label)
             pc[key] = ParsingUtils.clean_value(value, label)
+
+        # Разделение Building_and_Room на два разделных Building и Room
+        building_room_str = pc["Building_and_Room"]
+        building_match = re.search(
+            r"(\d+)\s*корпус", building_room_str, re.IGNORECASE
+        )
+        if building_match:
+            pc["Building"] = building_match.group(1)
+
+        room_match = re.search(r"(\d+)\s*комната", building_room_str, re.IGNORECASE)
+        if room_match:
+            pc["Room"] = room_match.group(1)
+
         self.parsed_data["PC"] = PCModel(**pc)
 
     @parser_method
@@ -281,137 +294,30 @@ class ExcelExporter(IExporter):
         excel_rows = []
 
         for item in data:
-            # --- Извлечение Корпуса и Комнаты ---
-            building_room_str = ParsingUtils.clean_value(item.PC.Building_and_Room)
-            building = ""
-            room = ""
-            building_match = re.search(
-                r"(\d+)\s*корпус", building_room_str, re.IGNORECASE
-            )
-            if building_match:
-                building = building_match.group(1)
-            room_match = re.search(r"(\d+)\s*комната", building_room_str, re.IGNORECASE)
-            if room_match:
-                room = room_match.group(1)
-            # Fallback if no specific pattern found, use the whole string for building, if room is empty
-            if (
-                    not building and building_room_str
-            ):  # If building not found, but string exists
-                building = (
-                    building_room_str.strip().split(" ")[0]
-                    if " " in building_room_str
-                    else building_room_str.strip()
-                )
-                if " " in building_room_str:
-                    room = (
-                        building_room_str.strip().split(" ")[1]
-                        if len(building_room_str.strip().split(" ")) > 1
-                        else ""
-                    )
-
-            # --- Формирование "Состав рабочей станции" ---
-            composition_items = []
-
-            monitor_it_numbers = [
-                ParsingUtils.clean_value(m.Assigned_IT_Number)
-                for m in item.Monitors
-                if ParsingUtils.clean_value(m.Assigned_IT_Number)
-            ]
-            if monitor_it_numbers:
-                composition_items.extend(monitor_it_numbers)
-
-            ups_it_number = ParsingUtils.clean_value(item.UPS.Assigned_IT_Number)
-            if ups_it_number:
-                composition_items.append(ups_it_number)
-
-            workstation_composition_display = (
-                "\n".join(composition_items) if composition_items else ""
-            )
-
-            # --- Формирование "Характеристики" ---
-            characteristics = []
-            if item.System_Memory:
-                if item.System_Memory.Capacity or item.System_Memory.Type:
-                    characteristics.append(
-                        f"Память: {ParsingUtils.clean_value(item.System_Memory.Capacity)} {ParsingUtils.clean_value(item.System_Memory.Type)}"
-                    )
-                for m in item.System_Memory.Modules:
-                    if m.Name or m.Description:
-                        characteristics.append(
-                            f"{ParsingUtils.clean_value(m.Name)} ({ParsingUtils.clean_value(m.Description)})"
-                        )
-
-            if item.Processor and (item.Processor.Type or item.Processor.Frequency):
-                characteristics.append(
-                    f"Процессор: {ParsingUtils.clean_value(item.Processor.Type)} {ParsingUtils.clean_value(item.Processor.Frequency)}"
-                )
-            if item.Motherboard and item.Motherboard.Model:
-                characteristics.append(
-                    f"Мат. плата: {ParsingUtils.clean_value(item.Motherboard.Model)}"
-                )
-            if item.Disk_Drives:
-                for d in item.Disk_Drives:
-                    if d.Name or d.Capacity:
-                        characteristics.append(
-                            f"Диск: {ParsingUtils.clean_value(d.Name)} ({ParsingUtils.clean_value(d.Capacity)})"
-                        )
-            if item.Video_Adapters:
-                for d in item.Video_Adapters:
-                    if d.Name:
-                        characteristics.append(
-                            f"Видео: {ParsingUtils.clean_value(d.Name)} ({ParsingUtils.clean_value(d.Memory)})"
-                        )
-
-            characteristics_str = "\n".join(characteristics)
-
-            # --- "Тип устройства" ---
-            device_type = ParsingUtils.clean_value(getattr(item.PC, "Product_Name", None))
-            if not device_type:
-                device_type = "Стационарный ПК"
-
-            # # --- "Серийный номер Каспер" ---
-            # kaspersky_serial = ParsingUtils.clean_value(
-            #     getattr(item.PC, "Kaspersky_Serial_Number", None)
-            # )
-            # if (
-            #         not kaspersky_serial
-            # ):
-            #     if (
-            #             ParsingUtils.clean_value(item.PC.Kaspersky_Installation_Attempted).lower()
-            #             == "да"
-            #     ):
-            #         kaspersky_serial = "Да"
-            #     else:
-            #         kaspersky_serial = "Нет"
-
             excel_rows.append(
                 {
-                    "Номер УП ИТ № 171": ParsingUtils.clean_value(item.PC.Assigned_IT_Number),
-                    "Состав рабочей станции": workstation_composition_display,
-                    "Работник": ParsingUtils.clean_value(item.PC.Responsible),
-                    "Подразделение": ParsingUtils.clean_value(item.PC.Department),
-                    "Корпус": ParsingUtils.clean_value(building),
-                    "Комната": ParsingUtils.clean_value(room),
-                    "Телефон": ParsingUtils.clean_value(item.PC.Phone),
-                    "Тип устройства": device_type,
-                    "Характеристики": characteristics_str,
-                    "IP адрес": ParsingUtils.clean_value(item.PC.Primary_IP_Address),
-                    "MAC адрес": ParsingUtils.clean_value(item.PC.Primary_MAC_Address),
-                    "Вид сети": ParsingUtils.clean_value(item.PC.Kaspersky_Network),
-                    "ИНВ. номер НИИТП": ParsingUtils.clean_value(
-                        item.PC.Inventory_Number_NII_TP
-                    ),
-                    "Серийный номер": ParsingUtils.clean_value(
-                        item.PC.DMI_System_Serial_Number
-                    ),
-                    "Каспер": (
-                        "Да"
-                        if ParsingUtils.clean_value(
-                            item.PC.Kaspersky_Installation_Attempted
-                        ).lower()
-                           == "да"
-                        else "Нет"
-                    ),
+                    "Номер УП ИТ № 171": item.PC.Assigned_IT_Number,
+                    "Состав рабочей станции": '\n'.join([m.Assigned_IT_Number for m in item.Monitors] + [item.UPS.Assigned_IT_Number]),
+                    "Работник": item.PC.Responsible,
+                    "Подразделение": item.PC.Department,
+                    "Корпус": item.PC.Building,
+                    "Комната": item.PC.Room,
+                    "Телефон": item.PC.Phone,
+                    "Тип устройства": 'Стационарный ПК',
+                    "Характеристики":
+                        '\n'.join([f"Память: {item.System_Memory.Capacity} {item.System_Memory.Type}"] +
+                                  [f"{m.Name} {m.Description}" for m in item.System_Memory.Modules] +
+                                  [f"Процессор: {item.Processor.Type} {item.Processor.Frequency}"] +
+                                  [f"Мат. плата: {item.Motherboard.Model}"] +
+                                  [f"{d.Name} {d.Capacity}" for d in item.Disk_Drives] +
+                                  [f"{v.Name} {v.Memory}" for v in item.Video_Adapters]
+                                  ),
+                    "IP адрес": item.PC.Primary_IP_Address,
+                    "MAC адрес": item.PC.Primary_MAC_Address,
+                    "Вид сети": item.PC.Kaspersky_Network,
+                    "ИНВ. номер НИИТП": item.PC.Inventory_Number_NII_TP,
+                    "Серийный номер": item.PC.DMI_System_Serial_Number,
+                    "Каспер": item.PC.Kaspersky_Installation_Attempted,
                 }
             )
 
