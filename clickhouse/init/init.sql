@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS computers_analytics
+CREATE TABLE IF NOT EXISTS inventory_db.computers_analytics
 (
     computer_id           UInt32,
     building              String,

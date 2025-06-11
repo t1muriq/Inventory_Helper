@@ -8,6 +8,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def init_db():
-    import library.src.application.db_models # Импортируем, чтобы модели были зарегистрированы в Base.metadata
+    from library.src.application import db_models
+    #import library.src.application.db_models # Импортируем, чтобы модели были зарегистрированы в Base.metadata
     print(Base.metadata.tables.keys())
     Base.metadata.create_all(bind=engine) 
