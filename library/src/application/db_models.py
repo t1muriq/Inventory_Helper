@@ -103,7 +103,6 @@ class Monitor(Base):
     assigned_it_number = Column(Text)
     model = Column(Text)
     serial_number = Column(Text)
-    year = Column(Text)
     resolution = Column(Text)
 
     computer = relationship("Computer", back_populates="monitors")

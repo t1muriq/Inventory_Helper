@@ -43,7 +43,6 @@ class MonitorModel(BaseModel):
     Assigned_IT_Number: str
     Model: str
     Serial_Number: str
-    Year: str
     Resolution: str
 
 class UPSModel(BaseModel):
