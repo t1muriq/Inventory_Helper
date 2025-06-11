@@ -28,8 +28,14 @@ services:
       - "9000:9000"  # Native TCP-интерфейс
     volumes:
       - clickhouse_temp_data:/var/lib/clickhouse
-      - clickhouse_logs:/var/log/cl
+      - clickhouse-logs:/var/log/clickhouse-server
       - ./clickhouse/init:/docker-entrypoint-initdb.d
+
+  db_init:
+    build:
+    depends_on:
+      - postgres
+    command: ["python", "initialize_db.py"]
 
 volumes:
   postgres_data:
