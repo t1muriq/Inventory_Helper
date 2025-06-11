@@ -1,9 +1,8 @@
 import re
-from typing import Dict, Optional
+from abc import ABC, abstractmethod
+from typing import Optional
 
 import pandas as pd
-
-from abc import ABC, abstractmethod
 
 from application.base_models import *
 
@@ -85,12 +84,13 @@ class FileReader(IReader):
                 )
         return lines
 
+
 def parser_method(func):
     func.is_parser = True
     return func
 
-class DataParser:
 
+class DataParser:
     parse_methods = []
 
     def __init__(self):
@@ -182,18 +182,21 @@ class DataParser:
 
     @parser_method
     def parse_video_adapter(self, lines: List[str]):
-        video_line = ParsingUtils.get_value(lines, "Видеоадаптер")
-        m = re.match(r"(.+?)\s+\((.+)\)", video_line)
-        if m:
-            video_name = m.group(1).strip()
-            video_mem = m.group(2).strip()
-        else:
-            video_name = video_line
-            video_mem = ""
-        video_name = ParsingUtils.clean_value(video_name, "Видеоадаптер")
-        self.parsed_data["Video_Adapter"] = VideoAdapterModel(
-            Name=video_name, Memory=ParsingUtils.clean_value(video_mem)
-        )
+        video_adapters = []
+        for l in lines:
+            if l.startswith("Видеоадаптер"):
+                m = re.match(r"(.+?)\s+\((.+)\)", l)
+                if m:
+                    video_name = m.group(1).strip()
+                    video_mem = m.group(2).strip()
+                else:
+                    video_name = l
+                    video_mem = ""
+                video_name = ParsingUtils.clean_value(video_name, "Видеоадаптер")
+                video_adapters.append(
+                    VideoAdapterModel(Name=video_name, Memory=ParsingUtils.clean_value(video_mem))
+                )
+        self.parsed_data["Video_Adapters"] = video_adapters
 
     @parser_method
     def parse_monitor(self, lines: List[str]):
@@ -266,7 +269,6 @@ class DataParser:
             method = getattr(self, name)
             if callable(method) and getattr(method, "is_parser", False):
                 method(lines)
-        print(self.parsed_data)
         return DataModel(**self.parsed_data)
 
 
@@ -353,12 +355,12 @@ class ExcelExporter(IExporter):
                         characteristics.append(
                             f"Диск: {ParsingUtils.clean_value(d.Name)} ({ParsingUtils.clean_value(d.Capacity)})"
                         )
-            if item.Video_Adapter and (
-                    item.Video_Adapter.Name or item.Video_Adapter.Memory
-            ):
-                characteristics.append(
-                    f"Видео: {ParsingUtils.clean_value(item.Video_Adapter.Name)} ({ParsingUtils.clean_value(item.Video_Adapter.Memory)})"
-                )
+            if item.Video_Adapters:
+                for d in item.Video_Adapters:
+                    if d.Name:
+                        characteristics.append(
+                            f"Видео: {ParsingUtils.clean_value(d.Name)} ({ParsingUtils.clean_value(d.Memory)})"
+                        )
 
             characteristics_str = "\n".join(characteristics)
 
@@ -367,20 +369,20 @@ class ExcelExporter(IExporter):
             if not device_type:
                 device_type = "Стационарный ПК"
 
-            # --- "Серийный номер Каспер" ---
-            kaspersky_serial = ParsingUtils.clean_value(
-                getattr(item.PC, "Kaspersky_Serial_Number", None)
-            )
-            if (
-                    not kaspersky_serial
-            ):
-                if (
-                        ParsingUtils.clean_value(item.PC.Kaspersky_Installation_Attempted).lower()
-                        == "да"
-                ):
-                    kaspersky_serial = "Да"
-                else:
-                    kaspersky_serial = "Нет"
+            # # --- "Серийный номер Каспер" ---
+            # kaspersky_serial = ParsingUtils.clean_value(
+            #     getattr(item.PC, "Kaspersky_Serial_Number", None)
+            # )
+            # if (
+            #         not kaspersky_serial
+            # ):
+            #     if (
+            #             ParsingUtils.clean_value(item.PC.Kaspersky_Installation_Attempted).lower()
+            #             == "да"
+            #     ):
+            #         kaspersky_serial = "Да"
+            #     else:
+            #         kaspersky_serial = "Нет"
 
             excel_rows.append(
                 {

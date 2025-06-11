@@ -64,7 +64,7 @@ class DataModel(BaseModel):
     Processor: ProcessorModel
     Motherboard: MotherboardModel
     Disk_Drives: List[DiskDriveModel]
-    Video_Adapter: VideoAdapterModel
+    Video_Adapters: List[VideoAdapterModel]
     Monitors: List[MonitorModel]
     UPS: UPSModel
     Workstation_Composition: str
