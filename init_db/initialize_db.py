@@ -1,5 +1,4 @@
-from application.database import init_db
-from application import db_models
+from data_base.database import init_db
 
 if __name__ == "__main__":
     print("Initializing database...")

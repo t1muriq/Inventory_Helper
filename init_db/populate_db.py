@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
-from application.database import SessionLocal, engine
-from application.db_models import (
-    Base, Building, Room, Computer, MemoryModule, Processor, Motherboard,
+from data_base.database import SessionLocal
+from data_base.db_models import (
+    Building, Room, Computer, MemoryModule, Processor, Motherboard,
     Disk, VideoAdapter, Monitor, UPS
 )
 

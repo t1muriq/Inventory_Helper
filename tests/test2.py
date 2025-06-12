@@ -1,10 +1,10 @@
 import unittest
-from unittest.mock import Mock, patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open
 
 from application.model import Model as TrueModel
 from application.base_models import PCModel
-from application.new_model.refactor_model import Model as WrongModel
-from application.new_model.refactor_model import DataParser, FileReader, ParsingUtils, ExcelExporter
+from application.model import Model as WrongModel
+from application.model import DataParser, FileReader, ParsingUtils, ExcelExporter
 
 
 class TestFunctions(unittest.TestCase):

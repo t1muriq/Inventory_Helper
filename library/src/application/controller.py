@@ -1,4 +1,4 @@
-from application.new_model.refactor_model import Model
+from application.model import Model
 from application.view import View
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from typing import List
