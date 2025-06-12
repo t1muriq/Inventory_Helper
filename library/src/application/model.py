@@ -1,6 +1,6 @@
 import re
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, IO
 
 import pandas as pd
 
@@ -10,7 +10,7 @@ from application.base_models import *
 class IReader(ABC):
 
     @abstractmethod
-    def read_data_from_file(self, filepath: str) -> List[str]:
+    def read_data(self, file: IO) -> List[str]:
         ...
 
 
@@ -54,35 +54,16 @@ class ParsingUtils:
 class FileReader(IReader):
     encodings = ["utf-8", "windows-1251"]
 
-    def read_data_from_file(self, filepath: str) -> List[str]:
+    def read_data(self, file: str) -> List[str]:
 
-        lines = None
-        last_exception = None
-
-        for type_encoding in self.encodings:
-            try:
-                with open(filepath, "r", encoding=type_encoding) as f:
-                    lines = [
-                        line.strip()
-                        for line in f
-                        if line.strip() and set(line.strip()) != {"-"}
-                    ]
-                break
-            except UnicodeDecodeError as e:
-                last_exception = e
-                continue
-            except OSError as e:
-                raise IOError(f"Не удалось прочитать файл {filepath}: {e}") from e
-
-        if lines is None:
-            if last_exception:
-                raise IOError(
-                    f"Не удалось прочитать файл {filepath} с кодировками UTF-8 или Windows-1251: {last_exception}") from last_exception
-            else:
-                raise IOError(
-                    f"Не удалось прочитать файл {filepath} с кодировками UTF-8 или Windows-1251."
-                )
+        lines = [
+            line.strip()
+            for line in file
+            if line.strip() and set(line.strip()) != {"-"}
+        ]
         return lines
+
+
 
 
 def parser_method(func):
@@ -335,8 +316,8 @@ class Model:
         self.exporter = exporter
         self.parser = DataParser()
 
-    def load_data(self, filepath: str):
-        lines = self.reader.read_data_from_file(filepath)
+    def load_data(self, file: IO):
+        lines = self.reader.read_data(file)
         parsed_data = self.parser.parse_all_data(lines)
         self.data.append(parsed_data)
 

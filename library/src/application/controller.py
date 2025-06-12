@@ -1,8 +1,42 @@
 from application.model import Model
 from application.view import View
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
-from typing import List
+from typing import List, IO
 
+
+
+class FileOpener:
+    encodings = ["utf-8", "windows-1251"]
+
+    def __init__(self, filepath: str, encodings=("utf-8", "windows-1251")):
+        self.filepath = filepath
+        self.encodings = encodings
+        self.file_obj: IO | None = None
+
+    def __enter__(self):
+        last_exception = None
+
+        for type_encoding in self.encodings:
+            try:
+                self.file_obj = open(self.filepath, "r", encoding=type_encoding)
+                return self.file_obj
+            except UnicodeDecodeError as e:
+                last_exception = e
+                continue
+            except OSError as e:
+                raise IOError(f"Не удалось прочитать файл {self.filepath}: {e}") from e
+
+        if last_exception:
+            raise IOError(
+                f"Не удалось прочитать файл {self.filepath} с кодировками UTF-8 или Windows-1251: {last_exception}") from last_exception
+        else:
+            raise IOError(
+                f"Не удалось прочитать файл {self.filepath} с кодировками UTF-8 или Windows-1251."
+            )
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.file_obj:
+            self.file_obj.close()
 
 class Controller:
     def __init__(self, model: Model, view: View) -> None:
@@ -33,7 +67,9 @@ class Controller:
 
             for file_path in files:
                 try:
-                    self.model.load_data(file_path)
+                    with FileOpener(file_path) as f:
+                        self.model.load_data(f)
+
                     self.loaded_file_paths.append(
                         file_path
                     )  # Сохраняем путь только для успешно загруженных
