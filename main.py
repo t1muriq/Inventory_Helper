@@ -1,5 +1,5 @@
 from application.view import View
-from application.new_model.refactor_model import Model, FileReader, ExcelExporter
+from application.model import Model, FileReader, ExcelExporter
 from application.controller import Controller
 
 from PyQt6.QtWidgets import QApplication
