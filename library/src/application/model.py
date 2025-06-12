@@ -1,8 +1,9 @@
 import re
 from abc import ABC, abstractmethod
-from typing import Optional, IO
+from typing import Optional, TextIO
 
 import pandas as pd
+from pydantic import ValidationError
 
 from application.base_models import *
 
@@ -10,7 +11,7 @@ from application.base_models import *
 class IReader(ABC):
 
     @abstractmethod
-    def read_data(self, file: IO) -> List[str]:
+    def read_data(self, file: TextIO) -> List[str]:
         ...
 
 
@@ -52,18 +53,14 @@ class ParsingUtils:
 
 
 class FileReader(IReader):
-    encodings = ["utf-8", "windows-1251"]
 
-    def read_data(self, file: str) -> List[str]:
-
+    def read_data(self, file: TextIO) -> List[str]:
         lines = [
             line.strip()
             for line in file
             if line.strip() and set(line.strip()) != {"-"}
         ]
         return lines
-
-
 
 
 def parser_method(func):
@@ -263,7 +260,11 @@ class DataParser:
         for name in dir(self):
             method = getattr(self, name)
             if callable(method) and getattr(method, "is_parser", False):
-                method(lines)
+                try:
+                    method(lines)
+                except ValidationError as e:
+                    raise ValueError(f"Validation error in method: {method} Exception: {e}")
+
         return DataModel(**self.parsed_data)
 
 
@@ -291,7 +292,9 @@ class ExcelExporter(IExporter):
                                   [f"{m.Name} {m.Description}" for m in item.System_Memory.Modules] +
                                   [f"Процессор: {item.Processor.Type} {item.Processor.Frequency}"] +
                                   [f"Мат. плата: {item.Motherboard.Model}"] +
+                                  [f"Дисковый накопитель"] +
                                   [f"{d.Name} {d.Capacity}" for d in item.Disk_Drives] +
+                                  [f"Видеоадаптер"] +
                                   [f"{v.Name} {v.Memory}" for v in item.Video_Adapters]
                                   ),
                     "IP адрес": item.PC.Primary_IP_Address,
@@ -316,7 +319,7 @@ class Model:
         self.exporter = exporter
         self.parser = DataParser()
 
-    def load_data(self, file: IO):
+    def load_data(self, file: TextIO):
         lines = self.reader.read_data(file)
         parsed_data = self.parser.parse_all_data(lines)
         self.data.append(parsed_data)
