@@ -66,7 +66,6 @@ CREATE TABLE IF NOT EXISTS monitors (
     assigned_it_number TEXT,
     model TEXT,
     serial_number TEXT,
-    year TEXT,
     resolution TEXT
 );
 
