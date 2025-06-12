@@ -21,6 +21,10 @@ def clear_data():
     model.clear_data()
     return {"message": "Data has been deleted successfully"}
 
+@app.delete("/data/{item_id}")
+def delete_elem_from_data(item_id: int):
+    return f"Delete field: {item_id} Data: {model.data.pop(item_id)}"
+
 @app.get("/data")
 def get_data():
     return model.data
@@ -28,6 +32,10 @@ def get_data():
 @app.post("/data")
 def insert_data():
     pass
+
+@app.get("/data/length")
+def get_length_data():
+    return len(model.data)
 
 @app.post("/data/file")
 def load_data_from_file(file: UploadFile = File(...)):
@@ -40,7 +48,11 @@ def load_data_from_file(file: UploadFile = File(...)):
 
 @app.get("/data/file")
 def get_file_from_data(background_tasks: BackgroundTasks):
-    model.export_data("temporary_excel.xlsx")
+    try:
+        model.export_data("temporary_excel.xlsx")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при экспорте данных: {e}")
+
     background_tasks.add_task(lambda path: os.remove(path), "temporary_excel.xlsx")
     return FileResponse(
         path="temporary_excel.xlsx",

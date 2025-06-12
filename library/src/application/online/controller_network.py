@@ -1,0 +1,193 @@
+from application.view import View
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from typing import List, IO
+import requests
+
+
+class FileOpener:
+    encodings = ["utf-8", "windows-1251"]
+
+    def __init__(self, filepath: str, open_mode='r', encodings=("utf-8", "windows-1251")):
+        self.filepath = filepath
+        self.open_mode = open_mode
+        self.encodings = encodings
+        self.file_obj: IO | None = None
+
+    def __enter__(self):
+        try:
+            self.file_obj = open(self.filepath, self.open_mode)
+            return self.file_obj
+        except OSError as e:
+            raise IOError(f"Не удалось прочитать файл {self.filepath}: {e}") from e
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.file_obj:
+            self.file_obj.close()
+
+class Controller:
+    def __init__(self, view: View) -> None:
+        self.server_url = "http://localhost:8000"
+        self.view = view
+        self.loaded_file_paths: List[str] = []  # Список полных путей загруженных файлов
+        self._connect_signals()
+
+    def _connect_signals(self) -> None:
+        self.view.select_button.clicked.connect(self._on_select_files)
+        self.view.convert_button.clicked.connect(self._on_convert_to_excel)
+        self.view.clear_button.clicked.connect(
+            self._on_clear_selected_file
+        )
+
+    def _on_select_files(self) -> None:
+        self.view.status.setText("Выбор файлов...")
+        files, _ = QFileDialog.getOpenFileNames(
+            self.view, "Выберите TXT файлы", "", "Text Files (*.txt)"
+        )
+        if files:
+            # Очищаем все предыдущие данные, если выбраны новые файлы
+
+            requests.delete(self.server_url + "/data")
+            # self.model.clear_data()
+            self.loaded_file_paths.clear()
+            self.view.file_list.clear()
+
+            self.view.status.setText("Загрузка и парсинг файлов...")
+
+            for file_path in files:
+                try:
+                    with FileOpener(file_path, open_mode='rb') as f:
+                        requests.post(self.server_url + "/data/file", files={"file": f})
+                        # self.model.load_data(f)
+
+                    self.loaded_file_paths.append(
+                        file_path
+                    )  # Сохраняем путь только для успешно загруженных
+                    self.view.file_list.addItem(f"✓ {file_path.split('/')[-1]}")
+                except IOError as e:
+                    QMessageBox.critical(
+                        self.view,
+                        "Ошибка чтения файла",
+                        f"Не удалось открыть или прочитать файл {file_path.split('/')[-1]}:\n{e}",
+                    )
+                    self.view.file_list.addItem(
+                        f"✗ {file_path.split('/')[-1]} (Ошибка чтения)"
+                    )
+                except ValueError as e:
+                    QMessageBox.critical(
+                        self.view,
+                        "Ошибка формата данных",
+                        f"Файл {file_path.split('/')[-1]} содержит данные неправильного формата:\n{e}",
+                    )
+                    self.view.file_list.addItem(
+                        f"✗ {file_path.split('/')[-1]} (Неверный формат)"
+                    )
+                except Exception as e:
+                    QMessageBox.critical(
+                        self.view,
+                        "Неизвестная ошибка",
+                        f"Произошла непредвиденная ошибка при обработке файла {file_path.split('/')[-1]}:\n{e}",
+                    )
+                    self.view.file_list.addItem(
+                        f"✗ {file_path.split('/')[-1]} (Неизвестная ошибка)"
+                    )
+
+            if not self.loaded_file_paths:  # Если ни один файл не загрузился успешно
+                self.view.file_list.addItem(
+                    "Здесь появятся выбранные TXT отчеты..."
+                )  # Снова placeholder
+                self.view.status.setText("Нет файлов для загрузки или все с ошибками.")
+            else:
+                self.view.status.setText(
+                    f"Успешно загружено {len(self.loaded_file_paths)} файлов."
+                )
+        else:
+            self.view.status.setText("Выбор файлов отменён.")
+
+    def _on_clear_selected_file(self) -> None:
+        selected_items = self.view.file_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self.view, "Ошибка", "Выберите файл для удаления.")
+            return
+
+        reply = QMessageBox.question(
+            self.view,
+            "Подтверждение",
+            "Вы действительно хотите удалить выделенный файл из списка?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            for item in selected_items:
+                row = self.view.file_list.row(item)
+                if 0 <= row < len(self.loaded_file_paths):
+                    # Удаляем из внутренних списков
+                    removed_path = self.loaded_file_paths.pop(row)
+                    # Удаляем соответствующий объект из модели по индексу
+
+                    response = requests.get(self.server_url + "/data/length")
+                    if response.ok:
+                        if row < response.json():  # Проверяем, чтобы избежать IndexError
+                            requests.delete(self.server_url + f"/data/{row}")
+                    else:
+                        raise ConnectionError(f"Не удалось подключиться к серверу {response.status_code}")
+
+                    # Удаляем из GUI списка
+                    self.view.file_list.takeItem(row)
+                    self.view.status.setText(
+                        f"Файл {removed_path.split('/')[-1]} удален. Обновлено: {len(self.loaded_file_paths)} файлов."
+                    )
+                else:
+                    self.view.status.setText(
+                        "Ошибка: выбранный файл не найден во внутренних данных."
+                    )
+
+            if not self.loaded_file_paths:  # Если список стал пустым после удаления
+                self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
+                self.view.status.setText("Список файлов пуст.")
+
+    def _on_convert_to_excel(self) -> None:
+
+        response = requests.get(self.server_url + "/data/length")
+        if response.ok:
+            length_data = response.json()
+        else:
+            raise ConnectionError(f"Не удалось подключиться к серверу {response.status_code}")
+
+        if length_data == 0:
+            QMessageBox.warning(self.view, "Нет данных", "Сначала загрузите TXT файлы.")
+            self.view.status.setText("Операция отменена: нет данных для экспорта.")
+            return
+
+        self.view.status.setText("Сохранение в Excel...")
+        save_path, _ = QFileDialog.getSaveFileName(
+            self.view,
+            "Сохранить Excel файл",
+            "Отчет_инвентаризации.xlsx",
+            "Excel Files (*.xlsx)",
+        )
+
+        if save_path:
+            try:
+                response = requests.get(self.server_url + "/data/file")
+                with open(save_path, "wb") as f:
+                    f.write(response.content)
+
+                QMessageBox.information(
+                    self.view, "Успех", f"Данные успешно сохранены в {save_path}"
+                )
+                self.view.status.setText(
+                    f"Данные сохранены в {save_path}. Данные очищены."
+                )
+                requests.delete(self.server_url + "/data")
+                # self.model.clear_data()
+                self.loaded_file_paths.clear()
+                self.view.file_list.clear()
+                self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
+            except Exception as e:
+                QMessageBox.critical(
+                    self.view, "Ошибка сохранения", f"Не удалось сохранить файл:\n{e}"
+                )
+                self.view.status.setText(f"Ошибка при сохранении: {e}")
+        else:
+            self.view.status.setText("Сохранение в Excel отменено.")
