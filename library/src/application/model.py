@@ -18,7 +18,15 @@ class IReader(ABC):
 class IExporter(ABC):
 
     @abstractmethod
-    def export_data(self, data: List[DataModel], output_path: str):
+    def clear_data(self):
+        ...
+
+    @abstractmethod
+    def load_data(self, data: List[DataModel], ):
+        ...
+
+    @abstractmethod
+    def export_data(self, output_path: str):
         ...
 
 
@@ -69,13 +77,15 @@ def parser_method(func):
 
 
 class DataParser:
-    parse_methods = []
 
     def __init__(self):
-        self.parsed_data = {}
+        self._parsed_data = {}
+
+    def clear_data(self):
+        self._parsed_data.clear()
 
     @parser_method
-    def parse_pc(self, lines: List[str]):
+    def _parse_pc(self, lines: List[str]):
         pc_fields = [
             ("Assigned_IT_Number", "Присваиваемый номер ИТ 171:"),
             ("Department", "Подразделение:"),
@@ -107,10 +117,10 @@ class DataParser:
         if room_match:
             pc["Room"] = room_match.group(1)
 
-        self.parsed_data["PC"] = PCModel(**pc)
+        self._parsed_data["PC"] = PCModel(**pc)
 
     @parser_method
-    def parse_system_memory(self, lines: List[str]):
+    def _parse_system_memory(self, lines: List[str]):
         mem_capacity_line = ParsingUtils.get_value(lines, "Системная память")
         mem_capacity_match = re.search(r"(\d+)\s*(\S+)", mem_capacity_line)
         if mem_capacity_match:
@@ -134,27 +144,27 @@ class DataParser:
                 desc = re.sub(r"\s*\([^)]*\)", "", desc).strip()
                 desc = ParsingUtils.clean_value(desc)
                 modules.append(MemoryModule(Name=name, Description=desc))
-        self.parsed_data["System_Memory"] = SystemMemoryModel(
+        self._parsed_data["System_Memory"] = SystemMemoryModel(
             Capacity=mem_capacity, Type=mem_type, Modules=modules
         )
 
     @parser_method
-    def parse_processor(self, lines: List[str]):
+    def _parse_processor(self, lines: List[str]):
         proc_line = ParsingUtils.get_value(lines, "Тип ЦП")
         proc_type_full, proc_freq = ParsingUtils.split_type_freq(proc_line)
         proc_type = ParsingUtils.clean_value(proc_type_full, "Тип ЦП")
-        self.parsed_data["Processor"] = ProcessorModel(
+        self._parsed_data["Processor"] = ProcessorModel(
             Type=proc_type, Frequency=ParsingUtils.clean_value(proc_freq)
         )
 
     @parser_method
-    def parse_motherboard(self, lines: List[str]):
+    def _parse_motherboard(self, lines: List[str]):
         mb_model_line = ParsingUtils.get_value(lines, "Системная плата")
         mb_model = ParsingUtils.clean_value(mb_model_line, "Системная плата")
-        self.parsed_data["Motherboard"] = MotherboardModel(Model=mb_model)
+        self._parsed_data["Motherboard"] = MotherboardModel(Model=mb_model)
 
     @parser_method
-    def parse_disk_drive(self, lines: List[str]):
+    def _parse_disk_drive(self, lines: List[str]):
         disk_drives = []
         for l in lines:
             if l.startswith("Дисковый накопитель"):
@@ -169,10 +179,10 @@ class DataParser:
                 disk_drives.append(
                     DiskDriveModel(Name=name, Capacity=ParsingUtils.clean_value(cap))
                 )
-        self.parsed_data["Disk_Drives"] = disk_drives
+        self._parsed_data["Disk_Drives"] = disk_drives
 
     @parser_method
-    def parse_video_adapter(self, lines: List[str]):
+    def _parse_video_adapter(self, lines: List[str]):
         video_adapters = []
         for l in lines:
             if l.startswith("Видеоадаптер"):
@@ -187,10 +197,10 @@ class DataParser:
                 video_adapters.append(
                     VideoAdapterModel(Name=video_name, Memory=ParsingUtils.clean_value(video_mem))
                 )
-        self.parsed_data["Video_Adapters"] = video_adapters
+        self._parsed_data["Video_Adapters"] = video_adapters
 
     @parser_method
-    def parse_monitor(self, lines: List[str]):
+    def _parse_monitor(self, lines: List[str]):
         monitors = []
         mon_idx = lines.index("Мониторы") if "Мониторы" in lines else -1
         if mon_idx != -1:
@@ -227,10 +237,10 @@ class DataParser:
                     i += 3
                 else:
                     break
-        self.parsed_data["Monitors"] = monitors
+        self._parsed_data["Monitors"] = monitors
 
     @parser_method
-    def parse_ups(self, lines: List[str]):
+    def _parse_ups(self, lines: List[str]):
         ups_idx = lines.index("ИБП") if "ИБП" in lines else -1
         ups_assigned_it_number = ""
         if ups_idx != -1 and ups_idx + 1 < len(lines):
@@ -239,22 +249,22 @@ class DataParser:
                 ups_assigned_it_number = ParsingUtils.clean_value(
                     ups_line.split(":", 1)[-1].strip(), "Присваиваемый номер ИТ 171:"
                 )
-        self.parsed_data["UPS"] = UPSModel(Assigned_IT_Number=ups_assigned_it_number)
+        self._parsed_data["UPS"] = UPSModel(Assigned_IT_Number=ups_assigned_it_number)
 
     @parser_method
-    def parse_misc_info(self, lines: List[str]):
+    def _parse_misc_info(self, lines: List[str]):
         ws_comp = ParsingUtils.clean_value(
             ParsingUtils.get_value(lines, "Состав рабочей станции:"), "Состав рабочей станции:"
         )
         comment = ParsingUtils.clean_value(
             ParsingUtils.get_value(lines, "Комментарий:"), "Комментарий:"
         )
-        self.parsed_data["Workstation_Composition"] = ws_comp
-        self.parsed_data["Comment"] = comment
+        self._parsed_data["Workstation_Composition"] = ws_comp
+        self._parsed_data["Comment"] = comment
 
     @parser_method
-    def parse_type_pc(self, lines: List[str]):
-        self.parsed_data["Type"] = lines[0]
+    def _parse_type_pc(self, lines: List[str]):
+        self._parsed_data["Type"] = lines[0]
 
     def parse_all_data(self, lines: List[str]) -> DataModel:
         for name in dir(self):
@@ -265,22 +275,27 @@ class DataParser:
                 except ValidationError as e:
                     raise ValueError(f"Validation error in method: {method} Exception: {e}")
 
-        return DataModel(**self.parsed_data)
+        return DataModel(**self._parsed_data)
 
 
 class ExcelExporter(IExporter):
 
-    def export_data(self, data: List[DataModel], output_path: str):
+    def __init__(self):
+        self._excel_rows = []
+
+    def clear_data(self):
+        self._excel_rows.clear()
+
+    def load_data(self, data: List[DataModel], ):
         if not data:
             raise ValueError("Нет данных для экспорта в Excel.")
 
-        excel_rows = []
-
         for item in data:
-            excel_rows.append(
+            self._excel_rows.append(
                 {
                     "Номер УП ИТ № 171": item.PC.Assigned_IT_Number,
-                    "Состав рабочей станции": '\n'.join([m.Assigned_IT_Number for m in item.Monitors] + [item.UPS.Assigned_IT_Number]),
+                    "Состав рабочей станции": '\n'.join(
+                        [m.Assigned_IT_Number for m in item.Monitors] + [item.UPS.Assigned_IT_Number]),
                     "Работник": item.PC.Responsible,
                     "Подразделение": item.PC.Department,
                     "Корпус": item.PC.Building,
@@ -306,7 +321,9 @@ class ExcelExporter(IExporter):
                 }
             )
 
-        df = pd.DataFrame(excel_rows)
+    def export_data(self, output_path: str) -> None:
+
+        df = pd.DataFrame(self._excel_rows)
 
         with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="Отчет по ПК", index=False)
@@ -323,9 +340,12 @@ class Model:
         lines = self.reader.read_data(file)
         parsed_data = self.parser.parse_all_data(lines)
         self.data.append(parsed_data)
+        self.parser.clear_data()
 
     def export_data(self, output_path: str):
-        self.exporter.export_data(self.data, output_path)
+        self.exporter.load_data(self.data)
+        self.exporter.export_data(output_path)
+        self.exporter.clear_data()
 
     def clear_data(self):
         self.data = []
