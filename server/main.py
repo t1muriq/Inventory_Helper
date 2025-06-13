@@ -135,7 +135,6 @@ def delete_elem_from_data(item_id: int, authorization: str = Header(...)):
 def get_data(authorization: str = Header(...)):
     return session_data[authorization]["model"].data
 
-
 @app.get("/data/length")
 @session_required(session_data)
 def get_length_data(authorization: str = Header(...)):
@@ -146,11 +145,11 @@ def get_length_data(authorization: str = Header(...)):
 def load_data_from_file(file: UploadFile = File(...), authorization: str = Header(...)):
     text_file = io.TextIOWrapper(file.file, encoding="utf-8")
     try:
-        session_data[authorization]["model"].load_data(text_file)
+        ret = session_data[authorization]["model"].load_data(text_file)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    return session_data[authorization]["model"].data
+    return {"it_num": ret}
 
 @app.get("/data/file")
 @session_required(session_data)

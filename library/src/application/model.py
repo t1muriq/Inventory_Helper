@@ -331,16 +331,18 @@ class ExcelExporter(IExporter):
 
 class Model:
     def __init__(self, reader: IReader, exporter: IExporter):
-        self.data = []
+        self.data: List[DataModel] = []
         self.reader = reader
         self.exporter = exporter
         self.parser = DataParser()
 
-    def load_data(self, file: TextIO):
+    def load_data(self, file: TextIO) -> str:
         lines = self.reader.read_data(file)
         parsed_data = self.parser.parse_all_data(lines)
+        ret = parsed_data.PC.Assigned_IT_Number
         self.data.append(parsed_data)
         self.parser.clear_data()
+        return ret
 
     def export_data(self, output_path: str):
         self.exporter.load_data(self.data)
@@ -348,4 +350,4 @@ class Model:
         self.exporter.clear_data()
 
     def clear_data(self):
-        self.data = []
+        self.data.clear()
