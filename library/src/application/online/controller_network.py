@@ -31,13 +31,13 @@ class FileOpener:
             self.file_obj.close()
 
 class Controller:
-    def __init__(self, view: View) -> None:
+    def __init__(self, view: View, server_url) -> None:
         self.view = view
         self.view.set_on_close_handler(self._close_app)
 
         self.loaded_file_paths: List[str] = []  # Список полных путей загруженных файлов
 
-        self.server_url = "http://localhost:8000"
+        self.server_url = server_url
         self.current_session = None
 
         self._create_session()

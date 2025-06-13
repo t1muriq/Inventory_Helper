@@ -10,7 +10,7 @@ def main():
     app = QApplication(sys.argv)
 
     window = View()
-    controller = Controller(window)
+    controller = Controller(window, "http://localhost:8000")
 
     window.show()
     sys.exit(app.exec())
