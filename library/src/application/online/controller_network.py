@@ -1,7 +1,10 @@
+from application.online.error_dialog import ErrorDialog
 from application.view import View
+
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from typing import List, IO
 import requests
+import sys
 
 
 class FileOpener:
@@ -27,9 +30,13 @@ class FileOpener:
 
 class Controller:
     def __init__(self, view: View) -> None:
-        self.server_url = "http://localhost:8000"
         self.view = view
         self.loaded_file_paths: List[str] = []  # Список полных путей загруженных файлов
+
+        self.server_url = "http://localhost:8000"
+        self.current_session = None
+
+        self._create_session()
         self._connect_signals()
 
     def _connect_signals(self) -> None:
@@ -39,16 +46,41 @@ class Controller:
             self._on_clear_selected_file
         )
 
+    def _create_session(self) -> bool:
+        response = requests.post(self.server_url + "/session/create")
+        if response.ok:
+            self.current_session = {"authorization": response.json()["session_id"]}
+            return True
+        return False
+
+    def _show_error_dialog(self) -> None:
+        dialog = ErrorDialog()
+        dialog.retry_button.clicked.connect(lambda: self._try_reconnect(dialog))
+        dialog.exit_button.clicked.connect(self._close_app)
+        dialog.exec()
+
+    def _try_reconnect(self, dialog: ErrorDialog):
+        success = self._create_session()
+        if success:
+            dialog.close()
+
+    @staticmethod
+    def _close_app() -> None:
+        sys.exit()
+
     def _on_select_files(self) -> None:
         self.view.status.setText("Выбор файлов...")
         files, _ = QFileDialog.getOpenFileNames(
             self.view, "Выберите TXT файлы", "", "Text Files (*.txt)"
         )
         if files:
-            # Очищаем все предыдущие данные, если выбраны новые файлы
 
-            requests.delete(self.server_url + "/data")
-            # self.model.clear_data()
+            response = requests.delete(self.server_url + "/data", headers=self.current_session)
+
+            if not response.ok:
+                self._show_error_dialog()
+                return
+
             self.loaded_file_paths.clear()
             self.view.file_list.clear()
 
@@ -57,8 +89,11 @@ class Controller:
             for file_path in files:
                 try:
                     with FileOpener(file_path, open_mode='rb') as f:
-                        requests.post(self.server_url + "/data/file", files={"file": f})
-                        # self.model.load_data(f)
+                        response = requests.post(self.server_url + "/data/file", files={"file": f}, headers=self.current_session)
+
+                        if not response.ok:
+                            self._show_error_dialog()
+                            return
 
                     self.loaded_file_paths.append(
                         file_path
@@ -125,12 +160,19 @@ class Controller:
                     removed_path = self.loaded_file_paths.pop(row)
                     # Удаляем соответствующий объект из модели по индексу
 
-                    response = requests.get(self.server_url + "/data/length")
+                    response = requests.get(self.server_url + "/data/length", headers=self.current_session)
+
                     if response.ok:
                         if row < response.json():  # Проверяем, чтобы избежать IndexError
-                            requests.delete(self.server_url + f"/data/{row}")
+                            response = requests.delete(self.server_url + f"/data/{row}", headers=self.current_session)
+
+                            if not response.ok:
+                                self._show_error_dialog()
+                                return
+
                     else:
-                        raise ConnectionError(f"Не удалось подключиться к серверу {response.status_code}")
+                        self._show_error_dialog()
+                        return
 
                     # Удаляем из GUI списка
                     self.view.file_list.takeItem(row)
@@ -148,11 +190,12 @@ class Controller:
 
     def _on_convert_to_excel(self) -> None:
 
-        response = requests.get(self.server_url + "/data/length")
-        if response.ok:
-            length_data = response.json()
-        else:
-            raise ConnectionError(f"Не удалось подключиться к серверу {response.status_code}")
+        response = requests.get(self.server_url + "/data/length", headers=self.current_session)
+        if not response.ok:
+            self._show_error_dialog()
+            return
+
+        length_data = response.json()
 
         if length_data == 0:
             QMessageBox.warning(self.view, "Нет данных", "Сначала загрузите TXT файлы.")
@@ -169,7 +212,11 @@ class Controller:
 
         if save_path:
             try:
-                response = requests.get(self.server_url + "/data/file")
+                response = requests.get(self.server_url + "/data/file", headers=self.current_session)
+                if not response.ok:
+                    self._show_error_dialog()
+                    return
+
                 with open(save_path, "wb") as f:
                     f.write(response.content)
 
@@ -179,8 +226,12 @@ class Controller:
                 self.view.status.setText(
                     f"Данные сохранены в {save_path}. Данные очищены."
                 )
-                requests.delete(self.server_url + "/data")
-                # self.model.clear_data()
+
+                response = requests.delete(self.server_url + "/data", headers=self.current_session)
+                if not response.ok:
+                    self._show_error_dialog()
+                    return
+
                 self.loaded_file_paths.clear()
                 self.view.file_list.clear()
                 self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")

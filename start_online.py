@@ -1,9 +1,9 @@
-from application.view import View
-from application.model import Model, FileReader, ExcelExporter
-from application.online.controller_network import Controller
+import sys
 
 from PyQt6.QtWidgets import QApplication
-import sys
+
+from application.online.controller_network import Controller
+from application.view import View
 
 
 def main():
