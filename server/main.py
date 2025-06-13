@@ -5,7 +5,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Dict
-
+from functools import wraps
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, HTTPException, Header, Query
 from fastapi.responses import FileResponse
 
@@ -34,8 +34,17 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 session_data: Dict[str, Dict[str, Model | datetime]] = dict()
+root_key = 1221
 
-
+def admin_required(expected_key: int):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, master_key: int = Query(...), **kwargs):
+            if master_key != expected_key:
+                raise HTTPException(status_code=403, detail="Forbidden: Invalid master key")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 def get_new_model() -> Model:
     return Model(FileReader(), ExcelExporter())
@@ -54,29 +63,21 @@ def update_session_activity(session_id: str):
 def root():
     return {"message": "Hello, FastAPI!"}
 
-
-
 # ----------- root endpoints DELETE IN FUTURE
 
-@app.get("/session")
+@app.get("/root/session")
+@admin_required(root_key)
 def get_all_sessions(master_key: int = Query(...)):
-    if master_key != 1221:
-        return {"message": "Failed"}
-
     return session_data
 
 @app.get("/root/time")
+@admin_required(root_key)
 def get_time_all_sessions(master_key: int = Query(...)):
-    if master_key != 1221:
-        return {"message": "Failed"}
-
     return [f"До конца сессии {session[0]} осталось {timedelta(minutes=5) - (datetime.now() - session[-1]["last_activity"])}" for session in session_data.items()]
 
 @app.delete("/root/close")
+@admin_required(root_key)
 def close_session_root(master_key: int = Query(...), session_id: str = Query(...)):
-    if master_key != 1221:
-        return {"message": "Failed"}
-
     session_data.pop(session_id, None)
     return {"message": f"Session: {session_id} has been deleted"}
 
