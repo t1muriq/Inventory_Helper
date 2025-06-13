@@ -1,3 +1,5 @@
+from PyQt6.QtCore import Qt
+
 from application.online.error_dialog import ErrorDialog
 from application.view import View
 
@@ -77,14 +79,12 @@ class Controller:
         )
         if files:
 
-            response = requests.delete(self.server_url + "/data", headers=self.current_session)
-
-            if not response.ok:
-                self._show_error_dialog()
-                return
-
-            self.loaded_file_paths.clear()
-            self.view.file_list.clear()
+            items = self.view.file_list.findItems(
+                "Здесь появятся выбранные TXT отчеты...", Qt.MatchFlag.MatchExactly
+            )
+            for item in items:
+                row = self.view.file_list.row(item)
+                self.view.file_list.takeItem(row)
 
             self.view.status.setText("Загрузка и парсинг файлов...")
 
@@ -93,22 +93,21 @@ class Controller:
                     with FileOpener(file_path, open_mode='rb') as f:
                         response = requests.post(self.server_url + "/data/file", files={"file": f}, headers=self.current_session)
 
-                        if not response.ok:
+                        if response.status_code == 422:
+                            raise ValueError(response.text)
+                        elif not response.ok:
                             self._show_error_dialog()
                             return
 
                     self.loaded_file_paths.append(
                         file_path
                     )  # Сохраняем путь только для успешно загруженных
-                    self.view.file_list.addItem(f"✓ {file_path.split('/')[-1]}")
+                    self.view.file_list.addItem(f"✓ Рабочая станция: {response.json()["it_num"]} (Загружена из файла: {file_path.split('/')[-1]})")
                 except IOError as e:
                     QMessageBox.critical(
                         self.view,
                         "Ошибка чтения файла",
                         f"Не удалось открыть или прочитать файл {file_path.split('/')[-1]}:\n{e}",
-                    )
-                    self.view.file_list.addItem(
-                        f"✗ {file_path.split('/')[-1]} (Ошибка чтения)"
                     )
                 except ValueError as e:
                     QMessageBox.critical(
@@ -116,17 +115,11 @@ class Controller:
                         "Ошибка формата данных",
                         f"Файл {file_path.split('/')[-1]} содержит данные неправильного формата:\n{e}",
                     )
-                    self.view.file_list.addItem(
-                        f"✗ {file_path.split('/')[-1]} (Неверный формат)"
-                    )
                 except Exception as e:
                     QMessageBox.critical(
                         self.view,
                         "Неизвестная ошибка",
                         f"Произошла непредвиденная ошибка при обработке файла {file_path.split('/')[-1]}:\n{e}",
-                    )
-                    self.view.file_list.addItem(
-                        f"✗ {file_path.split('/')[-1]} (Неизвестная ошибка)"
                     )
 
             if not self.loaded_file_paths:  # Если ни один файл не загрузился успешно
@@ -144,51 +137,64 @@ class Controller:
     def _on_clear_selected_file(self) -> None:
         selected_items = self.view.file_list.selectedItems()
         if not selected_items:
-            QMessageBox.warning(self.view, "Ошибка", "Выберите файл для удаления.")
-            return
+            reply = QMessageBox.question(
+                self.view,
+                "Подтверждение",
+                "Вы действительно хотите удалить все файлы",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                response = requests.delete(self.server_url + "/data", headers=self.current_session)
+                if not response.ok:
+                    self._show_error_dialog()
+                    return
 
-        reply = QMessageBox.question(
-            self.view,
-            "Подтверждение",
-            "Вы действительно хотите удалить выделенный файл из списка?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
+                self.loaded_file_paths.clear()
+                self.view.file_list.clear()
+        else:
+            reply = QMessageBox.question(
+                self.view,
+                "Подтверждение",
+                "Вы действительно хотите удалить выделенный файл из списка?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
 
-        if reply == QMessageBox.StandardButton.Yes:
-            for item in selected_items:
-                row = self.view.file_list.row(item)
-                if 0 <= row < len(self.loaded_file_paths):
-                    # Удаляем из внутренних списков
-                    removed_path = self.loaded_file_paths.pop(row)
-                    # Удаляем соответствующий объект из модели по индексу
+            if reply == QMessageBox.StandardButton.Yes:
+                for item in selected_items:
 
-                    response = requests.get(self.server_url + "/data/length", headers=self.current_session)
+                    row = self.view.file_list.row(item)
+                    if 0 <= row < len(self.loaded_file_paths):
+                        # Удаляем из внутренних списков
+                        removed_path = self.loaded_file_paths.pop(row)
+                        # Удаляем соответствующий объект из модели по индексу
 
-                    if response.ok:
-                        if row < response.json():  # Проверяем, чтобы избежать IndexError
-                            response = requests.delete(self.server_url + f"/data/{row}", headers=self.current_session)
+                        response = requests.get(self.server_url + "/data/length", headers=self.current_session)
 
-                            if not response.ok:
-                                self._show_error_dialog()
-                                return
+                        if response.ok:
+                            if row < response.json():  # Проверяем, чтобы избежать IndexError
+                                response = requests.delete(self.server_url + f"/data/{row}", headers=self.current_session)
 
+                                if not response.ok:
+                                    self._show_error_dialog()
+                                    return
+
+                        else:
+                            self._show_error_dialog()
+                            return
+
+                        # Удаляем из GUI списка
+                        self.view.file_list.takeItem(row)
+                        self.view.status.setText(
+                            f"Файл {removed_path.split('/')[-1]} удален. Обновлено: {len(self.loaded_file_paths)} файлов."
+                        )
                     else:
-                        self._show_error_dialog()
-                        return
+                        self.view.status.setText(
+                            "Ошибка: выбранный файл не найден во внутренних данных."
+                        )
 
-                    # Удаляем из GUI списка
-                    self.view.file_list.takeItem(row)
-                    self.view.status.setText(
-                        f"Файл {removed_path.split('/')[-1]} удален. Обновлено: {len(self.loaded_file_paths)} файлов."
-                    )
-                else:
-                    self.view.status.setText(
-                        "Ошибка: выбранный файл не найден во внутренних данных."
-                    )
-
-            if not self.loaded_file_paths:  # Если список стал пустым после удаления
-                self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
-                self.view.status.setText("Список файлов пуст.")
+        if not self.loaded_file_paths:  # Если список стал пустым после удаления
+            self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
+            self.view.status.setText("Список файлов пуст.")
 
     def _on_convert_to_excel(self) -> None:
 
@@ -226,17 +232,9 @@ class Controller:
                     self.view, "Успех", f"Данные успешно сохранены в {save_path}"
                 )
                 self.view.status.setText(
-                    f"Данные сохранены в {save_path}. Данные очищены."
+                    f"Данные сохранены в {save_path}."
                 )
 
-                response = requests.delete(self.server_url + "/data", headers=self.current_session)
-                if not response.ok:
-                    self._show_error_dialog()
-                    return
-
-                self.loaded_file_paths.clear()
-                self.view.file_list.clear()
-                self.view.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
             except Exception as e:
                 QMessageBox.critical(
                     self.view, "Ошибка сохранения", f"Не удалось сохранить файл:\n{e}"
