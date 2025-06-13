@@ -12,6 +12,8 @@ from fastapi.responses import FileResponse
 from application.model import Model, FileReader, ExcelExporter
 
 
+# ----------- background tasks -----------
+
 async def clear_inactive_sessions():
     while True:
         now = datetime.now()
@@ -32,9 +34,13 @@ async def lifespan(application: FastAPI):
 
     task.cancel()
 
+# ----------- definations of variables -----------
+
 app = FastAPI(lifespan=lifespan)
 session_data: Dict[str, Dict[str, Model | datetime]] = dict()
 root_key = 1221
+
+# ----------- decorators -----------
 
 def admin_required(expected_key: int):
     def decorator(func):
@@ -45,6 +51,20 @@ def admin_required(expected_key: int):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
+def session_required(data_dict: dict):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, authorization: str = Header(...), **kwargs):
+            if authorization not in data_dict:
+                raise HTTPException(status_code=401, detail="Invalid session")
+
+            update_session_activity(authorization)
+            return func(*args, authorization=authorization,**kwargs)
+        return wrapper
+    return decorator
+
+# ----------- functools -----------
 
 def get_new_model() -> Model:
     return Model(FileReader(), ExcelExporter())
@@ -63,7 +83,7 @@ def update_session_activity(session_id: str):
 def root():
     return {"message": "Hello, FastAPI!"}
 
-# ----------- root endpoints DELETE IN FUTURE
+# ----------- root endpoints DELETE IN FUTURE -----------
 
 @app.get("/root/session")
 @admin_required(root_key)
@@ -81,7 +101,7 @@ def close_session_root(master_key: int = Header(...), session_id: str = Query(..
     session_data.pop(session_id, None)
     return {"message": f"Session: {session_id} has been deleted"}
 
-# ------------ Normal endpoints ------------
+# ------------ normal endpoints ------------
 
 @app.post("/session/create")
 def create_session():
@@ -93,74 +113,54 @@ def create_session():
     return {"session_id": session_id}
 
 @app.delete("/session/close")
+@session_required(session_data)
 def close_session(authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
 
     session_data.pop(authorization, None)
     return {"message": f"Session: {authorization} close successfully"}
 
 @app.delete("/data")
+@session_required(session_data)
 def clear_data(authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
     session_data[authorization]["model"].clear_data()
-
-    update_session_activity(authorization)
     return {"message": "Data has been deleted successfully"}
 
 @app.delete("/data/{item_id}")
+@session_required(session_data)
 def delete_elem_from_data(item_id: int, authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    update_session_activity(authorization)
     return f"Delete field: {item_id} Data: {session_data[authorization]["model"].data.pop(item_id)}"
 
 @app.get("/data")
+@session_required(session_data)
 def get_data(authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    update_session_activity(authorization)
     return session_data[authorization]["model"].data
 
 
 @app.get("/data/length")
+@session_required(session_data)
 def get_length_data(authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    update_session_activity(authorization)
     return len(session_data[authorization]["model"].data)
 
 @app.post("/data/file")
+@session_required(session_data)
 def load_data_from_file(file: UploadFile = File(...), authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
     text_file = io.TextIOWrapper(file.file, encoding="utf-8")
     try:
         session_data[authorization]["model"].load_data(text_file)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    update_session_activity(authorization)
     return session_data[authorization]["model"].data
 
 @app.get("/data/file")
+@session_required(session_data)
 def get_file_from_data(background_tasks: BackgroundTasks, authorization: str = Header(...)):
-    if authorization not in session_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
     try:
         session_data[authorization]["model"].export_data("temporary_excel.xlsx")
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при экспорте данных: {e}")
 
     background_tasks.add_task(lambda path: os.remove(path), "temporary_excel.xlsx")
-    update_session_activity(authorization)
 
     return FileResponse(
         path="temporary_excel.xlsx",
