@@ -31,6 +31,8 @@ class FileOpener:
 class Controller:
     def __init__(self, view: View) -> None:
         self.view = view
+        self.view.set_on_close_handler(self._close_app)
+
         self.loaded_file_paths: List[str] = []  # Список полных путей загруженных файлов
 
         self.server_url = "http://localhost:8000"
@@ -64,8 +66,8 @@ class Controller:
         if success:
             dialog.close()
 
-    @staticmethod
-    def _close_app() -> None:
+    def _close_app(self) -> None:
+        requests.delete(self.server_url + "/session/close", headers=self.current_session)
         sys.exit()
 
     def _on_select_files(self) -> None:

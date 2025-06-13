@@ -144,6 +144,15 @@ class View(QWidget):
 
         self.setLayout(main_layout)
 
+        self._on_close_handler = None
+
+    def set_on_close_handler(self, handler):
+        self._on_close_handler = handler
+
+    def closeEvent(self, event):
+        if self._on_close_handler:
+            self._on_close_handler()
+        event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

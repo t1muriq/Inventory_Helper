@@ -65,15 +65,15 @@ def get_all_sessions(master_key: int = Query(...)):
 
     return session_data
 
-@app.get("/session/time")
+@app.get("/root/time")
 def get_time_all_sessions(master_key: int = Query(...)):
     if master_key != 1221:
         return {"message": "Failed"}
 
     return [f"До конца сессии {session[0]} осталось {timedelta(minutes=5) - (datetime.now() - session[-1]["last_activity"])}" for session in session_data.items()]
 
-@app.delete("/session/close")
-def close_session(master_key: int = Query(...), session_id: str = Query(...)):
+@app.delete("/root/close")
+def close_session_root(master_key: int = Query(...), session_id: str = Query(...)):
     if master_key != 1221:
         return {"message": "Failed"}
 
@@ -90,6 +90,14 @@ def create_session():
         "last_activity": datetime.now()
     }
     return {"session_id": session_id}
+
+@app.delete("/session/close")
+def close_session(authorization: str = Header(...)):
+    if authorization not in session_data:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    session_data.pop(authorization, None)
+    return {"message": f"Session: {authorization} close successfully"}
 
 @app.delete("/data")
 def clear_data(authorization: str = Header(...)):
