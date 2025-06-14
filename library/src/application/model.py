@@ -342,7 +342,7 @@ class Model:
         self.exporter = exporter
         self.parser = DataParser()
 
-    def load_data(self, file: TextIO, filename: str) -> str:
+    def load_data_from_file(self, file: TextIO, filename: str) -> str:
         lines = self.reader.read_data(file)
         parsed_data = self.parser.parse_all_data(lines)
         parsed_data.metadata["source"] = "file"
