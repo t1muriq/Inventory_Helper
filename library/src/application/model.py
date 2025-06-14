@@ -8,6 +8,11 @@ from pydantic import ValidationError
 from application.base_models import *
 
 
+class DataWrapper:
+    def __init__(self, data: DataModel):
+        self.system_data = data
+        self.metadata = {}
+
 class IReader(ABC):
 
     @abstractmethod
@@ -22,7 +27,7 @@ class IExporter(ABC):
         ...
 
     @abstractmethod
-    def load_data(self, data: List[DataModel], ):
+    def load_data(self, data: List[DataWrapper], ):
         ...
 
     @abstractmethod
@@ -266,7 +271,7 @@ class DataParser:
     def _parse_type_pc(self, lines: List[str]):
         self._parsed_data["Type"] = lines[0]
 
-    def parse_all_data(self, lines: List[str]) -> DataModel:
+    def parse_all_data(self, lines: List[str]) -> DataWrapper:
         for name in dir(self):
             method = getattr(self, name)
             if callable(method) and getattr(method, "is_parser", False):
@@ -275,7 +280,7 @@ class DataParser:
                 except ValidationError as e:
                     raise ValueError(f"Validation error in method: {method} Exception: {e}")
 
-        return DataModel(**self._parsed_data)
+        return DataWrapper(DataModel(**self._parsed_data))
 
 
 class ExcelExporter(IExporter):
@@ -286,38 +291,39 @@ class ExcelExporter(IExporter):
     def clear_data(self):
         self._excel_rows.clear()
 
-    def load_data(self, data: List[DataModel], ):
+    def load_data(self, data: List[DataWrapper], ):
         if not data:
             raise ValueError("Нет данных для экспорта в Excel.")
 
         for item in data:
+            model = item.system_data
             self._excel_rows.append(
                 {
-                    "Номер УП ИТ № 171": item.PC.Assigned_IT_Number,
+                    "Номер УП ИТ № 171": model.PC.Assigned_IT_Number,
                     "Состав рабочей станции": '\n'.join(
-                        [m.Assigned_IT_Number for m in item.Monitors] + [item.UPS.Assigned_IT_Number]),
-                    "Работник": item.PC.Responsible,
-                    "Подразделение": item.PC.Department,
-                    "Корпус": item.PC.Building,
-                    "Комната": item.PC.Room,
-                    "Телефон": item.PC.Phone,
-                    "Тип устройства": item.Type,
+                        [m.Assigned_IT_Number for m in model.Monitors] + [model.UPS.Assigned_IT_Number]),
+                    "Работник": model.PC.Responsible,
+                    "Подразделение": model.PC.Department,
+                    "Корпус": model.PC.Building,
+                    "Комната": model.PC.Room,
+                    "Телефон": model.PC.Phone,
+                    "Тип устройства": model.Type,
                     "Характеристики":
-                        '\n'.join([f"Память: {item.System_Memory.Capacity} {item.System_Memory.Type}"] +
-                                  [f"{m.Name} {m.Description}" for m in item.System_Memory.Modules] +
-                                  [f"Процессор: {item.Processor.Type} {item.Processor.Frequency}"] +
-                                  [f"Мат. плата: {item.Motherboard.Model}"] +
+                        '\n'.join([f"Память: {model.System_Memory.Capacity} {model.System_Memory.Type}"] +
+                                  [f"{m.Name} {m.Description}" for m in model.System_Memory.Modules] +
+                                  [f"Процессор: {model.Processor.Type} {model.Processor.Frequency}"] +
+                                  [f"Мат. плата: {model.Motherboard.Model}"] +
                                   [f"Дисковый накопитель"] +
-                                  [f"{d.Name} {d.Capacity}" for d in item.Disk_Drives] +
+                                  [f"{d.Name} {d.Capacity}" for d in model.Disk_Drives] +
                                   [f"Видеоадаптер"] +
-                                  [f"{v.Name} {v.Memory}" for v in item.Video_Adapters]
+                                  [f"{v.Name} {v.Memory}" for v in model.Video_Adapters]
                                   ),
-                    "IP адрес": item.PC.Primary_IP_Address,
-                    "MAC адрес": item.PC.Primary_MAC_Address,
-                    "Вид сети": item.PC.Kaspersky_Network,
-                    "ИНВ. номер НИИТП": item.PC.Inventory_Number_NII_TP,
-                    "Серийный номер": item.PC.DMI_System_Serial_Number,
-                    "Каспер": item.PC.Kaspersky_Installation_Attempted,
+                    "IP адрес": model.PC.Primary_IP_Address,
+                    "MAC адрес": model.PC.Primary_MAC_Address,
+                    "Вид сети": model.PC.Kaspersky_Network,
+                    "ИНВ. номер НИИТП": model.PC.Inventory_Number_NII_TP,
+                    "Серийный номер": model.PC.DMI_System_Serial_Number,
+                    "Каспер": model.PC.Kaspersky_Installation_Attempted,
                 }
             )
 
@@ -331,15 +337,17 @@ class ExcelExporter(IExporter):
 
 class Model:
     def __init__(self, reader: IReader, exporter: IExporter):
-        self.data: List[DataModel] = []
+        self.data: List[DataWrapper] = []
         self.reader = reader
         self.exporter = exporter
         self.parser = DataParser()
 
-    def load_data(self, file: TextIO) -> str:
+    def load_data(self, file: TextIO, filename: str) -> str:
         lines = self.reader.read_data(file)
         parsed_data = self.parser.parse_all_data(lines)
-        ret = parsed_data.PC.Assigned_IT_Number
+        parsed_data.metadata["source"] = "file"
+        parsed_data.metadata["filename"] = filename
+        ret = parsed_data.system_data.PC.Assigned_IT_Number
         self.data.append(parsed_data)
         self.parser.clear_data()
         return ret
