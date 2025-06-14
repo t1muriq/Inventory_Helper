@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15
@@ -15,7 +13,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   clickhouse:
-    image: clickhouse:25.4
+    image: clickhouse/clickhouse-server:25.4
     container_name: clickhouse-inventory_db
     restart: always
     environment:

@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, text
 from sqlalchemy.orm import relationship
 from .database import Base
+from datetime import datetime
 
 class Building(Base):
     __tablename__ = "buildings"
@@ -36,6 +37,7 @@ class Computer(Base):
     kaspersky_attempted = Column(Text)
     kaspersky_network = Column(Text)
     comment = Column(Text)
+    load_date = Column(DateTime,nullable=False, server_default=text('CURRENT_TIMESTAMP') ,default=datetime.now)
 
     room = relationship("Room", back_populates="computers")
     memory_modules = relationship("MemoryModule", back_populates="computer")
