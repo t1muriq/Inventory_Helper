@@ -148,7 +148,7 @@ class DataParser:
                     desc = re.sub(r"\s+", " ", desc).strip()
                 desc = re.sub(r"\s*\([^)]*\)", "", desc).strip()
                 desc = ParsingUtils.clean_value(desc)
-                modules.append(MemoryModule(Name=name, Description=desc))
+                modules.append(MemoryModel(Name=name, Description=desc))
         self._parsed_data["System_Memory"] = SystemMemoryModel(
             Capacity=mem_capacity, Type=mem_type, Modules=modules
         )

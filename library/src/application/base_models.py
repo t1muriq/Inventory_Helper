@@ -17,7 +17,7 @@ class PCModel(BaseModel):
     Primary_MAC_Address: str
 
 
-class MemoryModule(BaseModel):
+class MemoryModel(BaseModel):
     Name: str
     Description: str
 
@@ -25,7 +25,7 @@ class MemoryModule(BaseModel):
 class SystemMemoryModel(BaseModel):
     Capacity: str
     Type: str
-    Modules: List[MemoryModule]
+    Modules: List[MemoryModel]
 
 
 class ProcessorModel(BaseModel):
