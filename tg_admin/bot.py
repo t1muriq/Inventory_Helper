@@ -7,6 +7,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiohttp
 from dotenv import load_dotenv
 import os
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from functools import wraps
 
 load_dotenv()  # загружаем переменные из .env
 TG_TOKEN = os.getenv("TG_TOKEN")
@@ -32,25 +35,76 @@ main_menu = InlineKeyboardMarkup(
     ]
 )
 
-# Команда /start
+# --- Авторизация ---
+authorized_users = set()
+
+class AuthStates(StatesGroup):
+    waiting_for_key = State()
+
+# Проверка авторизации
+async def check_auth(message: Message):
+    if message.from_user.id not in authorized_users:
+        await message.answer("Введите admin_key для доступа:")
+        return False
+    return True
+
+# /start с авторизацией
 @dp.message(Command("start"))
-async def cmd_start(message: Message):
-    await message.answer(
-        "Добро пожаловать в админ-панель!\nВыберите действие:",
-        reply_markup=main_menu
-    )
+async def cmd_start(message: Message, state: FSMContext):
+    if message.from_user.id in authorized_users:
+        await message.answer(
+            "Добро пожаловать в админ-панель!\nВыберите действие:",
+            reply_markup=main_menu
+        )
+    else:
+        await message.answer("Введите admin_key для доступа:")
+        await state.set_state(AuthStates.waiting_for_key)
+
+# Обработка ввода admin_key
+@dp.message(AuthStates.waiting_for_key)
+async def process_admin_key(message: Message, state: FSMContext):
+    if message.text.strip() == ADMIN_KEY:
+        authorized_users.add(message.from_user.id)
+        await message.answer("Успешная авторизация!", reply_markup=main_menu)
+        await state.clear()
+    else:
+        await message.answer("Неверный ключ. Попробуйте снова:")
+
+# Декоратор для авторизации
+def require_auth(handler):
+    @wraps(handler)
+    async def wrapper(message: Message, *args, **kwargs):
+        if message.from_user.id not in authorized_users:
+            await message.answer("Сначала авторизуйтесь через /start")
+            return
+        return await handler(message, *args, **kwargs)
+    return wrapper
+
+
+def require_auth_callback(handler):
+    @wraps(handler)
+    async def wrapper(callback: CallbackQuery, *args, **kwargs):
+        if callback.from_user.id not in authorized_users:
+            await callback.message.answer("Сначала авторизуйтесь через /start")
+            await callback.answer()
+            return
+        return await handler(callback, *args, **kwargs)
+    return wrapper
 
 @dp.callback_query(lambda c: c.data == "show_sessions")
+@require_auth_callback
 async def cb_show_sessions(callback: CallbackQuery):
-    await get_sessions(callback.message)
+    await get_sessions_impl(callback.message)
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "show_times")
+@require_auth_callback
 async def cb_show_times(callback: CallbackQuery):
-    await get_times(callback.message)
+    await get_times_impl(callback.message)
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "delete_session_menu")
+@require_auth_callback
 async def cb_delete_session_menu(callback: CallbackQuery):
     # Показываем меню удаления сессии (тот же код, что и в /delete_session)
     async with aiohttp.ClientSession() as session:
@@ -79,9 +133,9 @@ async def cb_delete_session_menu(callback: CallbackQuery):
 # После каждой команды выводим главное меню
 async def send_main_menu(message):
     await message.answer("Выберите действие:", reply_markup=main_menu)
-# Получить все сессии
-@dp.message(Command("sessions"))
-async def get_sessions(message: Message):
+
+# --- Получить все сессии ---
+async def get_sessions_impl(message: Message):
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{API_URL}/root/session", headers={"Master-Key": ADMIN_KEY}) as resp:
             if resp.status == 200:
@@ -111,9 +165,13 @@ async def get_sessions(message: Message):
                 await message.answer(f"Ошибка: {resp.status}")
     await send_main_menu(message)
 
-# Получить время до конца сессий
-@dp.message(Command("times"))
-async def get_times(message: Message):
+@dp.message(Command("sessions"))
+@require_auth
+async def get_sessions(message: Message):
+    await get_sessions_impl(message)
+
+# --- Получить время до конца сессий ---
+async def get_times_impl(message: Message):
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{API_URL}/root/time", headers={"Master-Key": ADMIN_KEY}) as resp:
             if resp.status == 200:
@@ -148,8 +206,14 @@ async def get_times(message: Message):
                 await message.answer(f"Ошибка: {resp.status}")
     await send_main_menu(message)
 
+@dp.message(Command("times"))
+@require_auth
+async def get_times(message: Message):
+    await get_times_impl(message)
+
 # Удалить сессию по id
 @dp.message(Command("delete_session"))
+@require_auth
 async def delete_session(message: Message):
     parts = message.text.split()
     if len(parts) == 1:
@@ -183,12 +247,23 @@ async def delete_session(message: Message):
     await delete_session_by_id(message, session_id)
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("delete_session:"))
+@require_auth_callback
 async def process_delete_session_callback(callback: CallbackQuery):
     session_id = callback.data.split(":", 1)[1]
-    await delete_session_by_id(callback.message, session_id)
+    await delete_session_by_id(callback, session_id)
     await callback.answer("Сессия удалена", show_alert=False)
 
-async def delete_session_by_id(message, session_id):
+async def delete_session_by_id(source, session_id):
+    # source: Message или CallbackQuery
+    if isinstance(source, CallbackQuery):
+        user_id = source.from_user.id
+        send = source.message.answer
+    else:
+        user_id = source.from_user.id
+        send = source.answer
+    if user_id not in authorized_users:
+        await send("Сначала авторизуйтесь через /start")
+        return
     async with aiohttp.ClientSession() as session:
         async with session.delete(f"{API_URL}/root/close", headers={"Master-Key": ADMIN_KEY}, params={"session_id": session_id}) as resp:
             if resp.status == 200:
@@ -196,10 +271,10 @@ async def delete_session_by_id(message, session_id):
                 text = data.get("message", "Удалено")
                 if not text.strip():
                     text = "Нет ответа от сервера."
-                await message.answer(text)
+                await send(text)
             else:
-                await message.answer(f"Ошибка: {resp.status}")
-    await send_main_menu(message)
+                await send(f"Ошибка: {resp.status}")
+    await send_main_menu(source.message if isinstance(source, CallbackQuery) else source)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
