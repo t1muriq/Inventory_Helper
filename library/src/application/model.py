@@ -352,6 +352,12 @@ class Model:
         self.parser.clear_data()
         return ret
 
+    def load_data_from_model(self, data: DataModel, source: str):
+        data = DataWrapper(data)
+        data.metadata["source"] = source
+        self.data.append(data)
+        return data.system_data.PC.Assigned_IT_Number
+
     def export_data(self, output_path: str):
         self.exporter.load_data(self.data)
         self.exporter.export_data(output_path)

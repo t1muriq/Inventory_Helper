@@ -8,7 +8,10 @@ from typing import Dict
 from functools import wraps
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, HTTPException, Header, Query
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
 
+from data_base.converters import put_model_to_db, get_model_from_db, get_all_it_numbers
 from application.model import Model, FileReader, ExcelExporter
 
 
@@ -39,6 +42,14 @@ async def lifespan(application: FastAPI):
 app = FastAPI(lifespan=lifespan)
 session_data: Dict[str, Dict[str, Model | datetime]] = dict()
 root_key = "1221"
+
+# ----------- definations data base -----------
+
+DATABASE_URL = "postgresql://postgres:123@localhost:5435/inventory_db"
+engine = create_engine(DATABASE_URL, echo=False)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+CurrentSession = SessionLocal()
 
 # ----------- decorators -----------
 
@@ -119,28 +130,45 @@ def close_session(authorization: str = Header(...)):
     session_data.pop(authorization, None)
     return {"message": f"Session: {authorization} close successfully"}
 
-@app.delete("/data")
+@app.get("/session/data")
+@session_required(session_data)
+def get_data(authorization: str = Header(...)):
+    return session_data[authorization]["model"].data
+
+@app.delete("/session/data")
 @session_required(session_data)
 def clear_data(authorization: str = Header(...)):
     session_data[authorization]["model"].clear_data()
     return {"message": "Data has been deleted successfully"}
 
-@app.delete("/data/{item_id}")
+@app.delete("/session/data/{item_id}")
 @session_required(session_data)
 def delete_elem_from_data(item_id: int, authorization: str = Header(...)):
     return f"Delete field: {item_id} Data: {session_data[authorization]["model"].data.pop(item_id)}"
 
-@app.get("/data")
-@session_required(session_data)
-def get_data(authorization: str = Header(...)):
-    return session_data[authorization]["model"].data
-
-@app.get("/data/length")
+@app.get("/session/data/length")
 @session_required(session_data)
 def get_length_data(authorization: str = Header(...)):
     return len(session_data[authorization]["model"].data)
 
-@app.post("/data/file")
+@app.post("/session/data/upload-from-cloud")
+@session_required(session_data)
+def upload_data_from_cloud(authorization: str = Header(...)):
+    it_nums = get_all_it_numbers(CurrentSession)
+    for num in it_nums:
+        session_data[authorization]["model"].load_data_from_model(get_model_from_db(CurrentSession, num), "cloud")
+    return it_nums
+
+@app.post("/session/data/download-to-cloud")
+@session_required(session_data)
+def download_data_to_cloud(authorization: str = Header(...)):
+    ret = []
+    for model in session_data[authorization]["model"].data:
+        put_model_to_db(CurrentSession, model.system_data)
+        ret.append(model.system_data.PC.Assigned_IT_Number)
+    return ret
+
+@app.post("/session/data/file")
 @session_required(session_data)
 def load_data_from_file(file: UploadFile = File(...), authorization: str = Header(...)):
     text_file = io.TextIOWrapper(file.file, encoding="utf-8")
@@ -151,7 +179,7 @@ def load_data_from_file(file: UploadFile = File(...), authorization: str = Heade
 
     return {"it_num": ret}
 
-@app.get("/data/file")
+@app.get("/session/data/file")
 @session_required(session_data)
 def get_file_from_data(background_tasks: BackgroundTasks, authorization: str = Header(...)):
     try:

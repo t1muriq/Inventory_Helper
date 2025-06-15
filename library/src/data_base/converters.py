@@ -1,11 +1,12 @@
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from typing import Tuple
 
 from data_base.db_models import *
 from application.base_models import *
 from application.model import Model, FileReader, ExcelExporter
 
-def create_sql_row_from_pydantic(db: Session, data: DataModel):
+def put_model_to_db(db: Session, data: DataModel):
 
     existing_pc = db.query(Computer).filter_by(assigned_it_number=data.PC.Assigned_IT_Number).first()
 
@@ -98,7 +99,7 @@ def create_sql_row_from_pydantic(db: Session, data: DataModel):
     db.commit()
     db.refresh(pc)
 
-def create_pydantic_model_from_sql_row(db: Session, assigned_it_number: str) -> DataModel:
+def get_model_from_db(db: Session, assigned_it_number: str) -> DataModel:
     pc = db.query(Computer).filter(Computer.assigned_it_number == assigned_it_number).first()
 
     if not pc:
@@ -181,6 +182,11 @@ def create_pydantic_model_from_sql_row(db: Session, assigned_it_number: str) -> 
 
     return data_model
 
+def get_all_it_numbers(db: Session) -> Tuple[str]:
+    result = db.execute(select(Computer.assigned_it_number))
+    assigned_numbers_list = ([db_row[0] for db_row in result.fetchall()])
+    return assigned_numbers_list
+
 if __name__ == '__main__':
     #  Определение тестовой pydantic модели
     a = Model(FileReader(), ExcelExporter())
@@ -203,7 +209,7 @@ if __name__ == '__main__':
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Data_Base = SessionLocal()
 
-    create_sql_row_from_pydantic(Data_Base, test_model)
+    put_model_to_db(Data_Base, test_model)
 
     models = [Computer, MemoryModule, Processor, Motherboard, Disk, VideoAdapter, Monitor, UPS]
 
