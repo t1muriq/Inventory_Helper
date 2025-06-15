@@ -156,7 +156,7 @@ class View(QWidget):
         file_selection_layout.addWidget(self.select_button)
         self.file_list = QListWidget()
         self.file_list.setMinimumHeight(150)
-        self.file_list.addItem("Здесь появятся выбранные TXT отчеты...")
+        self.file_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         file_selection_layout.addWidget(self.file_list)
         file_selection_group.setLayout(file_selection_layout)
         file_selection_group.setStyleSheet("QGroupBox { padding-top: 14px; }")

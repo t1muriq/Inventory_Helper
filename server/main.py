@@ -38,14 +38,14 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 session_data: Dict[str, Dict[str, Model | datetime]] = dict()
-root_key = 1221
+root_key = "1221"
 
 # ----------- decorators -----------
 
-def admin_required(expected_key: int):
+def admin_required(expected_key: str):
     def decorator(func):
         @wraps(func)
-        def wrapper(*args, master_key: int = Header(...), **kwargs):
+        def wrapper(*args, master_key: str = Header(...), **kwargs):
             if master_key != expected_key:
                 raise HTTPException(status_code=403, detail="Forbidden: Invalid master key")
             return func(*args, **kwargs)
@@ -87,17 +87,17 @@ def root():
 
 @app.get("/root/session")
 @admin_required(root_key)
-def get_all_sessions(master_key: int = Header(...)):
+def get_all_sessions(master_key: str = Header(...)):
     return session_data
 
 @app.get("/root/time")
 @admin_required(root_key)
-def get_time_all_sessions(master_key: int = Header(...)):
+def get_time_all_sessions(master_key: str = Header(...)):
     return [f"До конца сессии {session[0]} осталось {timedelta(minutes=5) - (datetime.now() - session[-1]["last_activity"])}" for session in session_data.items()]
 
 @app.delete("/root/close")
 @admin_required(root_key)
-def close_session_root(master_key: int = Header(...), session_id: str = Query(...)):
+def close_session_root(master_key: str = Header(...), session_id: str = Query(...)):
     session_data.pop(session_id, None)
     return {"message": f"Session: {session_id} has been deleted"}
 
@@ -145,7 +145,7 @@ def get_length_data(authorization: str = Header(...)):
 def load_data_from_file(file: UploadFile = File(...), authorization: str = Header(...)):
     text_file = io.TextIOWrapper(file.file, encoding="utf-8")
     try:
-        ret = session_data[authorization]["model"].load_data(text_file)
+        ret = session_data[authorization]["model"].load_data_from_file(text_file, file.filename)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 

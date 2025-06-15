@@ -68,7 +68,7 @@ class Controller:
             for file_path in files:
                 try:
                     with FileOpener(file_path) as f:
-                        self.model.load_data(f)
+                        self.model.load_data_from_file(f, file_path.split('/')[-1])
 
                     self.loaded_file_paths.append(
                         file_path
