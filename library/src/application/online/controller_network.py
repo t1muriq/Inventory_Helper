@@ -1,4 +1,7 @@
+from http.client import responses
+
 from PyQt6.QtCore import Qt
+from numpy.lib.recfunctions import join_by
 
 from application.online.error_dialog import ErrorDialog
 from application.view import View
@@ -97,12 +100,28 @@ class Controller:
                 )
 
     def _download_from_cloud(self) -> None:
-        print("download")
-        ...
+        self.view.status.setText("Загрузка данных из облака...")
+        response = requests.post(self.server_url + "/session/data/upload-from-cloud", headers=self.current_session)
+        if not response.ok:
+            self._show_error_dialog()
+            return
+        self._update_list()
+        QMessageBox.information(
+            self.view, "Успех", f"Данные успешно загружены из облака"
+        )
+        self.view.status.setText(f"Рабочие станции: {', '.join(response.json())} успешно загружены из облака")
+
 
     def _upload_to_cloud(self) -> None:
-        print("upload")
-        ...
+        self.view.status.setText("Загрузка данных в облако...")
+        response = requests.post(self.server_url + "/session/data/download-to-cloud", headers=self.current_session)
+        if not response.ok:
+            self._show_error_dialog()
+            return
+        QMessageBox.information(
+            self.view, "Успех", f"Данные успешно загружены в облако"
+        )
+        self.view.status.setText(f"Рабочие станции: {', '.join(response.json())} успешно загружены из облака")
 
     def _on_select_files(self) -> None:
         self.view.status.setText("Выбор файлов...")

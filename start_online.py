@@ -10,7 +10,7 @@ def main():
     app = QApplication(sys.argv)
 
     window = View()
-    controller = Controller(window, "http://127.0.0.1:8000")
+    controller = Controller(window, "http://127.0.0.1:8000", update_time=10000)
 
     window.show()
     sys.exit(app.exec())
