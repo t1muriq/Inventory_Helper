@@ -11,8 +11,9 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QSpacerItem,
 )
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import Qt, QSize
+import os
 
 
 class View(QWidget):
@@ -21,6 +22,8 @@ class View(QWidget):
     convert_button: QPushButton
     clear_button: QPushButton
     status: QLabel
+    upload_cloud_button: QPushButton
+    download_cloud_button: QPushButton
 
     def __init__(self):
         super().__init__()
@@ -46,10 +49,7 @@ class View(QWidget):
                 background-color: #34495E; /* Темный фон для групп */
             }
             QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #BDC3C7; /* Светло-серый для заголовков групп */
+                color: #BDC3C7;
                 font-weight: bold;
                 font-size: 15px;
             }
@@ -69,6 +69,30 @@ class View(QWidget):
             }
             QPushButton#clearButton:hover {
                 background-color: #C0392B;
+            }
+            QPushButton#uploadCloudButton {
+                background: transparent;
+                border: none;
+                min-width: 36px;
+                min-height: 36px;
+                max-width: 36px;
+                max-height: 36px;
+                padding: 0;
+            }
+            QPushButton#uploadCloudButton:hover {
+                background: transparent;
+            }
+            QPushButton#downloadCloudButton {
+                background: transparent;
+                border: none;
+                min-width: 36px;
+                min-height: 36px;
+                max-width: 36px;
+                max-height: 36px;
+                padding: 0;
+            }
+            QPushButton#downloadCloudButton:hover {
+                background: transparent;
             }
             QListWidget {
                 background-color: #2D3E50; /* Темный фон списка */
@@ -93,6 +117,28 @@ class View(QWidget):
         main_layout.setContentsMargins(30, 25, 30, 25)
         main_layout.setSpacing(20)
 
+        # --- Маленькие облачные кнопки в правом верхнем углу ---
+        cloud_buttons_layout = QHBoxLayout()
+        cloud_buttons_layout.setSpacing(10)
+        cloud_buttons_layout.addStretch(1)
+        self.upload_cloud_button = QPushButton()
+        self.upload_cloud_button.setObjectName("uploadCloudButton")
+        self.upload_cloud_button.setToolTip("Загрузить в облако")
+        upload_icon_path = os.path.join(os.path.dirname(__file__), "icons", "cloud-upload.png")
+        self.upload_cloud_button.setIcon(QIcon(upload_icon_path))
+        self.upload_cloud_button.setIconSize(QSize(24, 24))
+        self.upload_cloud_button.setFixedSize(36, 36)
+        cloud_buttons_layout.addWidget(self.upload_cloud_button)
+        self.download_cloud_button = QPushButton()
+        self.download_cloud_button.setObjectName("downloadCloudButton")
+        self.download_cloud_button.setToolTip("Скачать с облака")
+        download_icon_path = os.path.join(os.path.dirname(__file__), "icons", "cloud-download.png")
+        self.download_cloud_button.setIcon(QIcon(download_icon_path))
+        self.download_cloud_button.setIconSize(QSize(24, 24))
+        self.download_cloud_button.setFixedSize(36, 36)
+        cloud_buttons_layout.addWidget(self.download_cloud_button)
+        main_layout.addLayout(cloud_buttons_layout)
+
         # Заголовок приложения
         title_label = QLabel("Система инвентаризации НИИ ТП")
         title_label.setObjectName("mainTitle")
@@ -102,6 +148,7 @@ class View(QWidget):
         # Группа для выбора файлов
         file_selection_group = QGroupBox("Загрузка отчетов инвентаризации (.txt)")
         file_selection_layout = QVBoxLayout()
+        file_selection_layout.setContentsMargins(10, 10, 10, 10)
         self.select_button = QPushButton("Выбрать файлы отчетов инвентаризации")
         self.select_button.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
@@ -112,11 +159,13 @@ class View(QWidget):
         self.file_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         file_selection_layout.addWidget(self.file_list)
         file_selection_group.setLayout(file_selection_layout)
+        file_selection_group.setStyleSheet("QGroupBox { padding-top: 14px; }")
         main_layout.addWidget(file_selection_group)
 
         # Группа для действий (кнопки)
         actions_group = QGroupBox("Действия с данными")
         actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(10, 10, 10, 10)
         actions_layout.addSpacerItem(
             QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
@@ -132,6 +181,7 @@ class View(QWidget):
             QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
         actions_group.setLayout(actions_layout)
+        actions_group.setStyleSheet("QGroupBox { padding-top: 14px; }")
         main_layout.addWidget(actions_group)
 
         # Статус-бар
