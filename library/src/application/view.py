@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
 )
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QTimer
 import os
 
 
@@ -195,9 +195,14 @@ class View(QWidget):
         self.setLayout(main_layout)
 
         self._on_close_handler = None
+        self.timer = QTimer()
 
     def set_on_close_handler(self, handler):
         self._on_close_handler = handler
+
+    def set_on_timer_handler(self, handler, time):
+        self.timer.timeout.connect(handler)
+        self.timer.start(time)  # обновлять каждые 3 секунды
 
     def closeEvent(self, event):
         if self._on_close_handler:

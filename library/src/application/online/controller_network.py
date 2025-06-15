@@ -31,9 +31,10 @@ class FileOpener:
             self.file_obj.close()
 
 class Controller:
-    def __init__(self, view: View, server_url) -> None:
+    def __init__(self, view: View, server_url, update_time: int = 3000) -> None:
         self.view = view
         self.view.set_on_close_handler(self._close_app)
+        self.view.set_on_timer_handler(self._update_list, update_time)
 
         self.server_url = server_url
         self.current_session = None
@@ -45,9 +46,9 @@ class Controller:
     def _connect_signals(self) -> None:
         self.view.select_button.clicked.connect(self._on_select_files)
         self.view.convert_button.clicked.connect(self._on_convert_to_excel)
-        self.view.clear_button.clicked.connect(
-            self._on_clear_selected_file
-        )
+        self.view.clear_button.clicked.connect(self._on_clear_selected_file)
+        self.view.upload_cloud_button.clicked.connect(self._upload_to_cloud)
+        self.view.download_cloud_button.clicked.connect(self._download_from_cloud)
 
     def _create_session(self) -> bool:
         response = requests.post(self.server_url + "/session/create")
@@ -74,7 +75,7 @@ class Controller:
     def _update_list(self) -> None:
         self.view.file_list.clear()
 
-        response = requests.get(self.server_url + "/data", headers=self.current_session)
+        response = requests.get(self.server_url + "/session/data", headers=self.current_session)
         if not response.ok:
             self._show_error_dialog()
             return
@@ -90,7 +91,18 @@ class Controller:
                     f"(Загружена из файла: {elem['metadata']['filename']})"
                 )
             elif elem["metadata"]["source"] == "cloud":
-                raise ValueError("Данный метод еще не реализован")
+                self.view.file_list.addItem(
+                    f"✓ Рабочая станция: {elem['system_data']['PC']['Assigned_IT_Number']} "
+                    f"(Загружена из облака)"
+                )
+
+    def _download_from_cloud(self) -> None:
+        print("download")
+        ...
+
+    def _upload_to_cloud(self) -> None:
+        print("upload")
+        ...
 
     def _on_select_files(self) -> None:
         self.view.status.setText("Выбор файлов...")
@@ -104,7 +116,7 @@ class Controller:
             for file_path in files:
                 try:
                     with FileOpener(file_path, open_mode='rb') as f:
-                        response = requests.post(self.server_url + "/data/file", files={"file": f}, headers=self.current_session)
+                        response = requests.post(self.server_url + "/session/data/file", files={"file": f}, headers=self.current_session)
 
                         if response.status_code == 422:
                             raise ValueError(response.text)
@@ -139,7 +151,7 @@ class Controller:
             self.view.status.setText("Выбор файлов отменён.")
 
     def _on_clear_selected_file(self) -> None:
-        response = requests.get(self.server_url + "/data/length", headers=self.current_session)
+        response = requests.get(self.server_url + "/session/data/length", headers=self.current_session)
         if not response.ok:
             self._show_error_dialog()
             return
@@ -158,7 +170,7 @@ class Controller:
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
-                response = requests.delete(self.server_url + "/data", headers=self.current_session)
+                response = requests.delete(self.server_url + "/session/data", headers=self.current_session)
                 if not response.ok:
                     self._show_error_dialog()
                     return
@@ -176,7 +188,7 @@ class Controller:
                 for item in selected_items:
 
                     row = self.view.file_list.row(item)
-                    response = requests.delete(self.server_url + f"/data/{row}", headers=self.current_session)
+                    response = requests.delete(self.server_url + f"/session/data/{row}", headers=self.current_session)
 
                     if not response.ok:
                         self._show_error_dialog()
@@ -187,7 +199,7 @@ class Controller:
 
     def _on_convert_to_excel(self) -> None:
 
-        response = requests.get(self.server_url + "/data/length", headers=self.current_session)
+        response = requests.get(self.server_url + "/session/data/length", headers=self.current_session)
         if not response.ok:
             self._show_error_dialog()
             return
@@ -209,7 +221,7 @@ class Controller:
 
         if save_path:
             try:
-                response = requests.get(self.server_url + "/data/file", headers=self.current_session)
+                response = requests.get(self.server_url + "/session/data/file", headers=self.current_session)
                 if not response.ok:
                     self._show_error_dialog()
                     return
