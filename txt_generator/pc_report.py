@@ -173,16 +173,49 @@ try:
 except Exception as e:
     primary_mac = f"Ошибка получения MAC: {e}"
 
+# Словарь для сопоставления только DDR2, DDR3, DDR4, DDR5
+MEMORY_TYPE_DDR_MAP = {
+    21: 'DDR2',
+    24: 'DDR3',
+    26: 'DDR4',
+    27: 'DDR5',
+}
+
+def get_ddr_type(mem):
+    # Получить тип памяти из MemoryType или SMBIOSMemoryType
+    mem_type_code = getattr(mem, 'MemoryType', None)
+    smbios_type_code = getattr(mem, 'SMBIOSMemoryType', None)
+    code = None
+    if mem_type_code in MEMORY_TYPE_DDR_MAP:
+        code = mem_type_code
+    elif smbios_type_code in MEMORY_TYPE_DDR_MAP:
+        code = smbios_type_code
+    if code:
+        return MEMORY_TYPE_DDR_MAP[code]
+    return "Unknown"
+
 # Системная память
 vm = psutil.virtual_memory()
-system_memory_info = f"{vm.total // (1024 ** 2)} МБ  (DDR4 SDRAM)"
+# Получаем тип памяти по первому модулю (если есть)
+system_memory_type = "Unknown"
+if wmi_available:
+    try:
+        mems = c.Win32_PhysicalMemory()
+        if mems:
+            system_memory_type = get_ddr_type(mems[0])
+    except Exception:
+        pass
+system_memory_info = f"{vm.total // (1024 ** 2)} МБ  ({system_memory_type})"
 
 # Модули памяти (WMI)
 dimm_info = []
 if wmi_available:
     try:
         for i, mem in enumerate(c.Win32_PhysicalMemory()):
-            dimm_info.append(f"DIMM{i+1}: {mem.PartNumber.strip()}                          {int(mem.Capacity) // (1024 ** 2)} МБ DDR4-{mem.Speed} DDR4 SDRAM")
+            mem_type = get_ddr_type(mem)
+            speed = getattr(mem, 'Speed', None)
+            speed_str = f"-{speed}" if speed else ""
+            dimm_info.append(f"DIMM{i+1}: {mem.PartNumber.strip()}                          {int(mem.Capacity) // (1024 ** 2)} МБ {mem_type}{speed_str} {mem_type}")
     except Exception:
         dimm_info.append("Не удалось получить данные DIMM через WMI.")
 else:
